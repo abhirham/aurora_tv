@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+<resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2">
     <string-array name="exo_controls_playback_speeds">
     <item>0.25 ಪಟ್ಟು</item>
     <item>0.5 ಪಟ್ಟು</item>
@@ -185,7 +185,7 @@
     <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
     <string msgid="2561197295334830845" name="switch_role">"ಬದಲಿಸಿ"</string>
     <string msgid="1672349317127674378" name="tab">"ಟ್ಯಾಬ್"</string>
-    <string msgid="5946805113151406391" name="template_percent">"<xliff:g id="PERCENTAGE">%1$d</xliff:g> ಶೇಕಡಾ."</string>
+    <string msgid="5946805113151406391" name="template_percent">"<ns1:g id="PERCENTAGE">%1$d</ns1:g> ಶೇಕಡಾ."</string>
     <string msgid="3765533235322692011" name="tooltip_description">"ಟೂಲ್‌ಟಿಪ್"</string>
     <string msgid="3124740595719787496" name="tooltip_label">"ಟೂಲ್‌ಟಿಪ್ ಅನ್ನು ತೋರಿಸಿ"</string>
 </resources>

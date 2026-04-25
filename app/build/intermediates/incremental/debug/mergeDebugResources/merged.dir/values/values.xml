@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2" xmlns:tools="http://schemas.android.com/tools">
+<resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2" xmlns:ns2="http://schemas.android.com/tools">
     <string-array name="exo_controls_playback_speeds">
     <item>0.25x</item>
     <item>0.5x</item>
@@ -475,7 +475,7 @@
     <string name="continue_watching">Continue Watching</string>
     <string name="default_error_message">"Invalid input"</string>
     <string name="default_notification_channel_name">Now playing</string>
-    <string name="default_popup_window_title" tools:ignore="ExtraTranslation">"Pop-Up Window"</string>
+    <string name="default_popup_window_title" ns2:ignore="ExtraTranslation">"Pop-Up Window"</string>
     <string name="dropdown_menu">"Dropdown menu"</string>
     <string name="enter_pip">Picture in Picture</string>
     <string name="epg_window">EPG Window Hours</string>
@@ -670,7 +670,7 @@
     </style>
     <style name="EdgeToEdgeFloatingDialogTheme" parent="android:Theme.DeviceDefault.Dialog">
         <item name="android:windowAnimationStyle">@null</item>
-        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="27">@integer/m3c_window_layout_in_display_cutout_mode</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" ns2:targetApi="27">@integer/m3c_window_layout_in_display_cutout_mode</item>
         <item name="android:windowClipToOutline">false</item>
         <item name="android:windowIsFloating">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
@@ -869,7 +869,7 @@
         <item name="android:windowBackground">@color/aurora_ink</item>
         <item name="android:windowAllowEnterTransitionOverlap">true</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
-        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="28">shortEdges</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" ns2:targetApi="28">shortEdges</item>
     </style>
     <style name="Widget.Compat.NotificationActionContainer" parent="">
         <item name="android:background">@drawable/notification_action_background</item>

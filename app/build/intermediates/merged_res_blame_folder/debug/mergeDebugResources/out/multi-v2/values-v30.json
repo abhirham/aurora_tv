@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.codexlabs.auroratv.app-mergeDebugResources-52:/values-v30/values-v30.xml",
+            "outputFile": "com.codexlabs.auroratv.app-mergeDebugResources-53:/values-v30/values-v30.xml",
             "map": [
                 {
-                    "source": "/Users/abhirhamsavarap/.gradle/caches/9.4.1/transforms/5e2b2a7b4cf934bf45950575523d8b5b/transformed/material3/res/values-v30/values-v30.xml",
+                    "source": "/Users/abhirhamsavarap/.gradle/caches/8.13/transforms/ed2c292ebf7758935606b93155c70bad/transformed/material3/res/values-v30/values-v30.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

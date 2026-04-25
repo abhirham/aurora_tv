@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.codexlabs.auroratv.app-mergeDebugResources-52:/values-v21/values-v21.xml",
+            "outputFile": "com.codexlabs.auroratv.app-mergeDebugResources-53:/values-v21/values-v21.xml",
             "map": [
                 {
-                    "source": "/Users/abhirhamsavarap/.gradle/caches/9.4.1/transforms/90806c243b4db9981d50c5dfd392187a/transformed/media3-session-1.10.0/res/values-v21/values-v21.xml",
+                    "source": "/Users/abhirhamsavarap/.gradle/caches/8.13/transforms/976641bbfabcba5c5bd7ae0b33f5d2fd/transformed/media3-session-1.10.0/res/values-v21/values-v21.xml",
                     "from": {
                         "startLines": "2,5,8,11",
                         "startColumns": "4,4,4,4",
@@ -23,7 +23,7 @@
                     }
                 },
                 {
-                    "source": "/Users/abhirhamsavarap/.gradle/caches/9.4.1/transforms/580cd8e1b3daa6de52d507afbffe7a3d/transformed/media3-ui-1.10.0/res/values-v21/values-v21.xml",
+                    "source": "/Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f730902cadd453c98b807bd3189edfad/transformed/media3-ui-1.10.0/res/values-v21/values-v21.xml",
                     "from": {
                         "startLines": "2,3",
                         "startColumns": "4,4",
