@@ -1,0 +1,9 @@
+<resources>
+    <color name="aurora_ink">#07111E</color>
+    <color name="aurora_surface">#101C2B</color>
+    <color name="aurora_surface_alt">#16273B</color>
+    <color name="aurora_teal">#4BE1C3</color>
+    <color name="aurora_copper">#FF8A3D</color>
+    <color name="aurora_sand">#F4E5CF</color>
+    <color name="aurora_red">#FF6471</color>
+</resources>
