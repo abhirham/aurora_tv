@@ -25,9 +25,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1905,11 +1907,27 @@ private fun LibraryGridLayout(
     emptyMessage: String,
     content: LazyGridScope.() -> Unit,
 ) {
+    val selectedCategoryFocusRequester = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val coroutineScope = rememberCoroutineScope()
+    val selectedIndex = categories.indexOfFirst { it.remoteId == selectedCategoryId }
+        .takeIf { it >= 0 }
+
+    LaunchedEffect(selectedIndex) {
+        selectedIndex?.let { listState.scrollToItem(it) }
+    }
+
+    LaunchedEffect(selectedCategoryId) {
+        gridState.scrollToItem(0)
+    }
+
     Row(
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .width(260.dp)
                 .fillMaxHeight()
@@ -1919,11 +1937,16 @@ private fun LibraryGridLayout(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
+                val isSelected = selectedCategoryId == category.remoteId
                 FocusCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
-                    selected = selectedCategoryId == category.remoteId,
+                        .height(44.dp)
+                        .then(
+                            if (isSelected) Modifier.focusRequester(selectedCategoryFocusRequester)
+                            else Modifier,
+                        ),
+                    selected = isSelected,
                     onClick = { onCategorySelected(category.remoteId) },
                 ) {
                     Text(
@@ -1946,9 +1969,20 @@ private fun LibraryGridLayout(
             }
         } else {
             LazyVerticalGrid(
+                state = gridState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .onFocusChanged { state ->
+                        if (state.hasFocus) {
+                            selectedIndex?.let { index ->
+                                coroutineScope.launch { listState.scrollToItem(index) }
+                            }
+                        }
+                    }
+                    .focusProperties {
+                        if (selectedIndex != null) left = selectedCategoryFocusRequester
+                    }
                     .focusRestorer()
                     .focusGroup(),
                 columns = GridCells.Adaptive(180.dp),
