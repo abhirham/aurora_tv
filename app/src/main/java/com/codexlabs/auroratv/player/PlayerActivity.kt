@@ -30,9 +30,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -49,7 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -123,6 +125,7 @@ class PlayerActivity : ComponentActivity() {
     private var activeDescriptor by mutableStateOf<PlaybackDescriptor?>(null)
     private var currentSettings by mutableStateOf(AppSettings())
     private var errorMessage by mutableStateOf<String?>(null)
+    private var revealOverlayKeyUpCode: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -164,6 +167,8 @@ class PlayerActivity : ComponentActivity() {
                     onTogglePlayPause = {
                         if (player.isPlaying) player.pause() else player.play()
                     },
+                    onStartOver = { startOver() },
+                    onNextEpisode = { playNextEpisode() },
                     onPrevChannel = { switchChannel(-1) },
                     onNextChannel = { switchChannel(1) },
                     onEnterPip = { enterPictureInPictureIfSupported() },
@@ -174,6 +179,11 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_UP && event.keyCode == revealOverlayKeyUpCode) {
+            revealOverlayKeyUpCode = null
+            return true
+        }
+
         if (event.action != KeyEvent.ACTION_DOWN) {
             return super.dispatchKeyEvent(event)
         }
@@ -182,26 +192,16 @@ class PlayerActivity : ComponentActivity() {
         when (event.keyCode) {
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                 if (player.isPlaying) player.pause() else player.play()
-                overlayVisible = true
+                revealOverlay(event.keyCode)
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
             -> {
                 if (!overlayVisible) {
-                    overlayVisible = true
-                    return true
-                }
-            }
-            KeyEvent.KEYCODE_DPAD_UP -> {
-                if (!overlayVisible && descriptor.isLive) {
-                    switchChannel(-1)
-                    return true
-                }
-            }
-            KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (!overlayVisible && descriptor.isLive) {
-                    switchChannel(1)
+                    revealOverlay(event.keyCode)
                     return true
                 }
             }
@@ -219,6 +219,11 @@ class PlayerActivity : ComponentActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun revealOverlay(keyCode: Int) {
+        overlayVisible = true
+        revealOverlayKeyUpCode = keyCode
     }
 
     override fun onStop() {
@@ -300,6 +305,21 @@ class PlayerActivity : ComponentActivity() {
         player.seekTo(newPosition)
     }
 
+    private fun startOver() {
+        val descriptor = activeDescriptor ?: return
+        if (descriptor.isLive) return
+        player.seekTo(0L)
+        player.play()
+        overlayVisible = true
+    }
+
+    private fun playNextEpisode() {
+        val nextEpisodeId = activeDescriptor?.nextEpisodeId ?: return
+        lifecycleScope.launch {
+            loadDescriptor(TargetType.EPISODE, nextEpisodeId, null)
+        }
+    }
+
     private fun persistProgress() {
         val descriptor = activeDescriptor ?: return
         if (descriptor.isLive) return
@@ -344,6 +364,8 @@ private fun PlayerScreen(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onTogglePlayPause: () -> Unit,
+    onStartOver: () -> Unit,
+    onNextEpisode: () -> Unit,
     onPrevChannel: () -> Unit,
     onNextChannel: () -> Unit,
     onEnterPip: () -> Unit,
@@ -435,6 +457,8 @@ private fun PlayerScreen(
                 onTogglePlayPause = onTogglePlayPause,
                 onSeekBack = onSeekBack,
                 onSeekForward = onSeekForward,
+                onStartOver = onStartOver,
+                onNextEpisode = onNextEpisode,
                 onPrevChannel = onPrevChannel,
                 onNextChannel = onNextChannel,
                 onEnterPip = onEnterPip,
@@ -471,6 +495,8 @@ private fun PlayerOverlay(
     onTogglePlayPause: () -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
+    onStartOver: () -> Unit,
+    onNextEpisode: () -> Unit,
     onPrevChannel: () -> Unit,
     onNextChannel: () -> Unit,
     onEnterPip: () -> Unit,
@@ -481,6 +507,13 @@ private fun PlayerOverlay(
     val currentShow = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
     val nextShow = guide.firstOrNull { it.startEpochMillis > (currentShow?.startEpochMillis ?: now) }
     val isLive = descriptor?.isLive == true
+    val canStartOver = descriptor?.isLive == false
+    val playButtonFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        playButtonFocusRequester.requestFocus()
+    }
 
     Box(
         modifier = Modifier
@@ -502,28 +535,24 @@ private fun PlayerOverlay(
             horizontalArrangement = Arrangement.spacedBy(28.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            MinimalPlayerIcon(
+            TopPlayerAction(
                 icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                label = "Back",
                 onClick = onClose,
             )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MinimalPlayerIcon(
-                        icon = Icons.Rounded.SkipPrevious,
-                        onClick = if (isLive) onPrevChannel else onTogglePlayPause,
-                    )
-                    MinimalPlayerIcon(
+            if (canStartOver) {
+                TopPlayerAction(
+                    icon = Icons.Rounded.Replay,
+                    label = "Start Over",
+                    onClick = onStartOver,
+                )
+                if (descriptor?.nextEpisodeId != null) {
+                    TopPlayerAction(
                         icon = Icons.Rounded.SkipNext,
-                        onClick = if (isLive) onNextChannel else onTogglePlayPause,
+                        label = "Next Episode",
+                        onClick = onNextEpisode,
                     )
                 }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "OPTIONS",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
-                )
             }
         }
 
@@ -584,6 +613,7 @@ private fun PlayerOverlay(
                     onSeekBack = onSeekBack,
                     onSeekForward = onSeekForward,
                     seekEnabled = !isLive,
+                    focusRequester = playButtonFocusRequester,
                 )
                 Text(
                     text = if (isLive) "LIVE" else formatProgressTime(positionMs),
@@ -661,16 +691,14 @@ private fun PlaybackProgressBar(
 }
 
 @Composable
-private fun MinimalPlayerIcon(
+private fun TopPlayerAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Box(
+    Column(
         modifier = Modifier
-            .size(50.dp)
-            .clip(RoundedCornerShape(50.dp))
-            .background(if (focused) Color.White else Color.Transparent)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -682,13 +710,28 @@ private fun MinimalPlayerIcon(
             }
             .focusable()
             .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (focused) Color.Black else Color.White,
-            modifier = Modifier.size(36.dp),
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(50.dp))
+                .background(if (focused) Color.White else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (focused) Color.Black else Color.White,
+                modifier = Modifier.size(34.dp),
+            )
+        }
+        Text(
+            label,
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Black,
         )
     }
 }
@@ -700,11 +743,13 @@ private fun LargeRoundPlayButton(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     seekEnabled: Boolean,
+    focusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .size(82.dp)
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .clip(RoundedCornerShape(82.dp))
             .background(if (focused) Color.White else Color.Transparent)
             .onFocusChanged { focused = it.isFocused }

@@ -326,6 +326,12 @@ class IptvRepository(
             }
             TargetType.EPISODE -> {
                 val episode = dao.episodeById(targetId.toLong()) ?: error("Episode not found")
+                val nextEpisode = dao.nextEpisodeAfter(
+                    seriesId = episode.seriesId,
+                    seasonNumber = episode.seasonNumber,
+                    episodeNumber = episode.episodeNumber,
+                    episodeId = episode.episodeId,
+                )
                 PlaybackDescriptor(
                     targetType = targetType,
                     targetId = targetId,
@@ -334,6 +340,8 @@ class IptvRepository(
                     artworkUrl = episode.artworkUrl,
                     mediaUrl = xtreamApi.episodeStreamUrl(credentials, episode),
                     isLive = false,
+                    nextEpisodeId = nextEpisode?.episodeId?.toString(),
+                    nextEpisodeTitle = nextEpisode?.title,
                 )
             }
             TargetType.SERIES -> error("Series items require an episode target")

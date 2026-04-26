@@ -88,6 +88,8 @@ data class PlaybackDescriptor(
     val isLive: Boolean,
     val categoryId: String? = null,
     val epgChannelId: String? = null,
+    val nextEpisodeId: String? = null,
+    val nextEpisodeTitle: String? = null,
 )
 
 data class LibraryStats(

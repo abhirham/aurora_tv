@@ -1187,6 +1187,112 @@ public class MediaDao_Impl(
     }
   }
 
+  public override suspend fun nextEpisodeAfter(
+    seriesId: Long,
+    seasonNumber: Int,
+    episodeNumber: Int,
+    episodeId: Long,
+  ): EpisodeEntity? {
+    val _sql: String = """
+        |
+        |        SELECT * FROM episodes
+        |        WHERE seriesId = ?
+        |          AND (
+        |              seasonNumber > ?
+        |              OR (seasonNumber = ? AND episodeNumber > ?)
+        |              OR (seasonNumber = ? AND episodeNumber = ? AND episodeId > ?)
+        |          )
+        |        ORDER BY seasonNumber, episodeNumber, episodeId
+        |        LIMIT 1
+        |        
+        """.trimMargin()
+    return performSuspending(__db, true, false) { _connection ->
+      val _stmt: SQLiteStatement = _connection.prepare(_sql)
+      try {
+        var _argIndex: Int = 1
+        _stmt.bindLong(_argIndex, seriesId)
+        _argIndex = 2
+        _stmt.bindLong(_argIndex, seasonNumber.toLong())
+        _argIndex = 3
+        _stmt.bindLong(_argIndex, seasonNumber.toLong())
+        _argIndex = 4
+        _stmt.bindLong(_argIndex, episodeNumber.toLong())
+        _argIndex = 5
+        _stmt.bindLong(_argIndex, seasonNumber.toLong())
+        _argIndex = 6
+        _stmt.bindLong(_argIndex, episodeNumber.toLong())
+        _argIndex = 7
+        _stmt.bindLong(_argIndex, episodeId)
+        val _columnIndexOfEpisodeId: Int = getColumnIndexOrThrow(_stmt, "episodeId")
+        val _columnIndexOfSeriesId: Int = getColumnIndexOrThrow(_stmt, "seriesId")
+        val _columnIndexOfSeasonNumber: Int = getColumnIndexOrThrow(_stmt, "seasonNumber")
+        val _columnIndexOfEpisodeNumber: Int = getColumnIndexOrThrow(_stmt, "episodeNumber")
+        val _columnIndexOfTitle: Int = getColumnIndexOrThrow(_stmt, "title")
+        val _columnIndexOfArtworkUrl: Int = getColumnIndexOrThrow(_stmt, "artworkUrl")
+        val _columnIndexOfPlot: Int = getColumnIndexOrThrow(_stmt, "plot")
+        val _columnIndexOfDurationSeconds: Int = getColumnIndexOrThrow(_stmt, "durationSeconds")
+        val _columnIndexOfContainerExtension: Int = getColumnIndexOrThrow(_stmt, "containerExtension")
+        val _columnIndexOfDirectSource: Int = getColumnIndexOrThrow(_stmt, "directSource")
+        val _columnIndexOfAddedAt: Int = getColumnIndexOrThrow(_stmt, "addedAt")
+        val _result: EpisodeEntity?
+        if (_stmt.step()) {
+          val _tmpEpisodeId: Long
+          _tmpEpisodeId = _stmt.getLong(_columnIndexOfEpisodeId)
+          val _tmpSeriesId: Long
+          _tmpSeriesId = _stmt.getLong(_columnIndexOfSeriesId)
+          val _tmpSeasonNumber: Int
+          _tmpSeasonNumber = _stmt.getLong(_columnIndexOfSeasonNumber).toInt()
+          val _tmpEpisodeNumber: Int
+          _tmpEpisodeNumber = _stmt.getLong(_columnIndexOfEpisodeNumber).toInt()
+          val _tmpTitle: String
+          _tmpTitle = _stmt.getText(_columnIndexOfTitle)
+          val _tmpArtworkUrl: String?
+          if (_stmt.isNull(_columnIndexOfArtworkUrl)) {
+            _tmpArtworkUrl = null
+          } else {
+            _tmpArtworkUrl = _stmt.getText(_columnIndexOfArtworkUrl)
+          }
+          val _tmpPlot: String?
+          if (_stmt.isNull(_columnIndexOfPlot)) {
+            _tmpPlot = null
+          } else {
+            _tmpPlot = _stmt.getText(_columnIndexOfPlot)
+          }
+          val _tmpDurationSeconds: Long?
+          if (_stmt.isNull(_columnIndexOfDurationSeconds)) {
+            _tmpDurationSeconds = null
+          } else {
+            _tmpDurationSeconds = _stmt.getLong(_columnIndexOfDurationSeconds)
+          }
+          val _tmpContainerExtension: String?
+          if (_stmt.isNull(_columnIndexOfContainerExtension)) {
+            _tmpContainerExtension = null
+          } else {
+            _tmpContainerExtension = _stmt.getText(_columnIndexOfContainerExtension)
+          }
+          val _tmpDirectSource: String?
+          if (_stmt.isNull(_columnIndexOfDirectSource)) {
+            _tmpDirectSource = null
+          } else {
+            _tmpDirectSource = _stmt.getText(_columnIndexOfDirectSource)
+          }
+          val _tmpAddedAt: Long?
+          if (_stmt.isNull(_columnIndexOfAddedAt)) {
+            _tmpAddedAt = null
+          } else {
+            _tmpAddedAt = _stmt.getLong(_columnIndexOfAddedAt)
+          }
+          _result = EpisodeEntity(_tmpEpisodeId,_tmpSeriesId,_tmpSeasonNumber,_tmpEpisodeNumber,_tmpTitle,_tmpArtworkUrl,_tmpPlot,_tmpDurationSeconds,_tmpContainerExtension,_tmpDirectSource,_tmpAddedAt)
+        } else {
+          _result = null
+        }
+        _result
+      } finally {
+        _stmt.close()
+      }
+    }
+  }
+
   public override suspend fun episodeCountForSeries(seriesId: Long): Int {
     val _sql: String = "SELECT COUNT(*) FROM episodes WHERE seriesId = ?"
     return performSuspending(__db, true, false) { _connection ->

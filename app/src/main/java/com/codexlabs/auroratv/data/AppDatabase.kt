@@ -275,6 +275,26 @@ interface MediaDao {
     @Query("SELECT * FROM episodes WHERE episodeId = :episodeId")
     suspend fun episodeById(episodeId: Long): EpisodeEntity?
 
+    @Query(
+        """
+        SELECT * FROM episodes
+        WHERE seriesId = :seriesId
+          AND (
+              seasonNumber > :seasonNumber
+              OR (seasonNumber = :seasonNumber AND episodeNumber > :episodeNumber)
+              OR (seasonNumber = :seasonNumber AND episodeNumber = :episodeNumber AND episodeId > :episodeId)
+          )
+        ORDER BY seasonNumber, episodeNumber, episodeId
+        LIMIT 1
+        """,
+    )
+    suspend fun nextEpisodeAfter(
+        seriesId: Long,
+        seasonNumber: Int,
+        episodeNumber: Int,
+        episodeId: Long,
+    ): EpisodeEntity?
+
     @Query("SELECT COUNT(*) FROM episodes WHERE seriesId = :seriesId")
     suspend fun episodeCountForSeries(seriesId: Long): Int
 
