@@ -15,6 +15,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -56,8 +57,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -67,6 +69,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -112,6 +115,22 @@ private const val SEEK_REPEAT_INITIAL_DELAY_MS = 500L
 private const val SEEK_REPEAT_INTERVAL_MS = 100L
 private const val PLAYBACK_PROGRESS_UPDATE_MS = 100L
 
+private val KnownTrackLanguageNames: List<String> by lazy {
+    Locale.getAvailableLocales()
+        .flatMap { locale ->
+            listOf(
+                locale.getDisplayLanguage(Locale.ENGLISH),
+                locale.getDisplayLanguage(Locale.getDefault()),
+            )
+        }
+        .map { it.trim() }
+        .filter { languageName ->
+            languageName.length > 2 && languageName.any { it.isLetter() }
+        }
+        .distinctBy { it.lowercase(Locale.US) }
+        .sortedByDescending { it.length }
+}
+
 private data class SubtitleTrackOption(
     val label: String,
     val mediaTrackGroup: TrackGroup,
@@ -121,10 +140,16 @@ private data class SubtitleTrackOption(
 
 private data class AudioTrackOption(
     val label: String,
+    val shortLabel: String,
     val mediaTrackGroup: TrackGroup,
     val trackIndex: Int,
     val selected: Boolean,
     val isDefault: Boolean,
+)
+
+private data class AudioTrackLabels(
+    val shortLabel: String,
+    val detailLabel: String,
 )
 
 class PlayerActivity : ComponentActivity() {
@@ -648,7 +673,9 @@ private fun PlayerOverlay(
         Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 64.dp, top = 56.dp),
+                .padding(start = 64.dp, top = 56.dp)
+                .focusRestorer()
+                .focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(28.dp),
             verticalAlignment = Alignment.Top,
         ) {
@@ -710,7 +737,10 @@ private fun PlayerOverlay(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRestorer()
+                    .focusGroup(),
                 horizontalArrangement = Arrangement.spacedBy(28.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -759,7 +789,9 @@ private fun PlayerOverlay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                        .horizontalScroll(rememberScrollState())
+                        .focusRestorer()
+                        .focusGroup(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -811,6 +843,8 @@ private fun LanguageOptionsSidebar(
                 .fillMaxHeight()
                 .width(390.dp)
                 .background(Color(0xEA000000))
+                .focusRestorer()
+                .focusGroup()
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.DirectionLeft || event.key == Key.Back) {
                         if (event.type == KeyEventType.KeyUp) onDismiss()
@@ -823,7 +857,7 @@ private fun LanguageOptionsSidebar(
                 .padding(start = 34.dp, top = 84.dp, end = 42.dp, bottom = 54.dp),
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
-            TrackSectionTitle("Subtitles")
+            TrackSectionTitle("Closed captions")
             TrackSelectionRow(
                 label = "Off",
                 selected = subtitleOptions.none { it.selected },
@@ -839,10 +873,10 @@ private fun LanguageOptionsSidebar(
             }
 
             if (audioOptions.isNotEmpty()) {
-                TrackSectionTitle("Audio")
+                TrackSectionTitle("Audio tracks")
                 audioOptions.forEach { option ->
                     TrackSelectionRow(
-                        label = audioPillLabel(option, originalAudioOption),
+                        label = audioDrawerLabel(option, originalAudioOption),
                         selected = option.selected,
                         onClick = { onAudioSelected(option) },
                     )
@@ -873,6 +907,7 @@ private fun TrackSelectionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(46.dp)
             .clip(RoundedCornerShape(50.dp))
             .background(if (focused) Color(0xFFE8EEFF) else Color.Transparent)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
@@ -906,6 +941,8 @@ private fun TrackSelectionRow(
             color = if (focused) Color.Black else Color.White,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -1171,12 +1208,14 @@ private fun audioTrackOptions(
                 .filter { trackIndex -> group.isTrackSupported(trackIndex, true) }
                 .map { trackIndex ->
                     val format = group.getTrackFormat(trackIndex)
+                    val labels = audioTrackLabels(format, optionNumber++)
                     val selected = selectedOption?.let {
                         isSameTrackGroup(it.mediaTrackGroup, group.getMediaTrackGroup()) &&
                             it.trackIndex == trackIndex
                     } ?: group.isTrackSelected(trackIndex)
                     AudioTrackOption(
-                        label = audioTrackLabel(format, optionNumber++),
+                        label = labels.detailLabel,
+                        shortLabel = labels.shortLabel,
                         mediaTrackGroup = group.getMediaTrackGroup(),
                         trackIndex = trackIndex,
                         selected = selected,
@@ -1239,9 +1278,9 @@ private fun selectSubtitleTrack(player: Player, option: SubtitleTrackOption?) {
     player.trackSelectionParameters = builder.build()
 }
 
-private fun audioTrackLabel(format: Format, fallbackIndex: Int): String {
-    val label = format.label?.takeIf { it.isNotBlank() }
-    val language = displayLanguageName(format.language)
+private fun audioTrackLabels(format: Format, fallbackIndex: Int): AudioTrackLabels {
+    val language = trackLanguageName(format) ?: "Audio $fallbackIndex"
+    val channelLabel = audioChannelLabel(format)
     val role = when {
         format.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 -> "Audio Description"
         format.roleFlags and C.ROLE_FLAG_COMMENTARY != 0 -> "Commentary"
@@ -1249,23 +1288,34 @@ private fun audioTrackLabel(format: Format, fallbackIndex: Int): String {
         format.roleFlags and C.ROLE_FLAG_ALTERNATE != 0 -> "Alternate"
         else -> null
     }
-    val parts = listOfNotNull(label, language, role)
-        .distinctBy { it.lowercase(Locale.getDefault()) }
-    return parts.takeIf { it.isNotEmpty() }?.joinToString(" ") ?: "Audio $fallbackIndex"
+    val detailedBase = listOfNotNull(language, channelLabel)
+        .joinToString(", ")
+    val detailedLabel = listOfNotNull(detailedBase, role)
+        .joinToString(" - ")
+    val shortLabel = listOfNotNull(language, role?.takeIf { channelLabel == null })
+        .joinToString(" - ")
+    return AudioTrackLabels(
+        shortLabel = shortLabel,
+        detailLabel = detailedLabel,
+    )
 }
 
 private fun subtitleTrackLabel(format: Format, fallbackIndex: Int): String {
-    val label = format.label?.takeIf { it.isNotBlank() }
-    val language = displayLanguageName(format.language)
+    val language = trackLanguageName(format)
     val role = when {
         format.selectionFlags and C.SELECTION_FLAG_FORCED != 0 -> "Forced"
-        format.roleFlags and C.ROLE_FLAG_CAPTION != 0 -> "CC"
         format.roleFlags and C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND != 0 -> "SDH"
         else -> null
     }
-    val parts = listOfNotNull(label, language, role)
-        .distinctBy { it.lowercase(Locale.getDefault()) }
-    return parts.takeIf { it.isNotEmpty() }?.joinToString(" ") ?: "Subtitle $fallbackIndex"
+    return listOfNotNull(language, role)
+        .joinToString(", ")
+        .takeIf { it.isNotBlank() }
+        ?: "Subtitle $fallbackIndex"
+}
+
+private fun trackLanguageName(format: Format): String? {
+    return displayLanguageName(format.language)
+        ?: extractLanguageName(rawTrackText(format))
 }
 
 private fun displayLanguageName(languageTag: String?): String? {
@@ -1273,6 +1323,7 @@ private fun displayLanguageName(languageTag: String?): String? {
         ?.takeIf { it.isNotBlank() && it.lowercase(Locale.US) != "und" }
         ?.let { tag ->
             val normalizedTag = tag.replace('_', '-')
+            if (!isLikelyLanguageTag(normalizedTag)) return@let null
             Locale.forLanguageTag(normalizedTag)
                 .getDisplayName(Locale.getDefault())
                 .takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != normalizedTag.lowercase(Locale.getDefault()) }
@@ -1280,11 +1331,69 @@ private fun displayLanguageName(languageTag: String?): String? {
         }
 }
 
+private fun isLikelyLanguageTag(languageTag: String): Boolean {
+    return Regex("^[A-Za-z]{2,3}(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?$")
+        .matches(languageTag)
+}
+
+private fun extractLanguageName(rawTrackText: String?): String? {
+    val normalizedTrackText = rawTrackText
+        ?.replace('_', ' ')
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+
+    return KnownTrackLanguageNames.firstOrNull { languageName ->
+        Regex(
+            pattern = "(^|[^\\p{L}])${Regex.escape(languageName)}([^\\p{L}]|$)",
+            option = RegexOption.IGNORE_CASE,
+        ).containsMatchIn(normalizedTrackText)
+    }
+}
+
+private fun audioChannelLabel(format: Format): String? {
+    return when (format.channelCount) {
+        1 -> "Mono"
+        2 -> "Stereo"
+        6 -> "5.1 surround sound"
+        8 -> "7.1 surround sound"
+        else -> audioChannelLabelFromRawText(rawTrackText(format))
+    }
+}
+
+private fun audioChannelLabelFromRawText(rawTrackText: String?): String? {
+    val rawText = rawTrackText?.takeIf { it.isNotBlank() } ?: return null
+    return when {
+        Regex("(?i)(^|[^0-9])7\\.1([^0-9]|$)").containsMatchIn(rawText) -> "7.1 surround sound"
+        Regex("(?i)(^|[^0-9])5\\.1([^0-9]|$)").containsMatchIn(rawText) -> "5.1 surround sound"
+        Regex("(?i)(^|[^0-9])2\\.0([^0-9]|$)|stereo").containsMatchIn(rawText) -> "Stereo"
+        Regex("(?i)(^|[^0-9])1\\.0([^0-9]|$)|mono").containsMatchIn(rawText) -> "Mono"
+        else -> null
+    }
+}
+
+private fun rawTrackText(format: Format): String? {
+    return listOfNotNull(format.language, format.label)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+        .takeIf { it.isNotBlank() }
+}
+
 private fun originalAudioOption(audioOptions: List<AudioTrackOption>): AudioTrackOption? {
     return audioOptions.firstOrNull { it.isDefault } ?: audioOptions.firstOrNull()
 }
 
 private fun audioPillLabel(
+    option: AudioTrackOption,
+    originalAudioOption: AudioTrackOption?,
+): String {
+    return if (originalAudioOption != null && isSameTrack(option, originalAudioOption)) {
+        option.shortLabel.withOriginalSuffix()
+    } else {
+        option.shortLabel
+    }
+}
+
+private fun audioDrawerLabel(
     option: AudioTrackOption,
     originalAudioOption: AudioTrackOption?,
 ): String {

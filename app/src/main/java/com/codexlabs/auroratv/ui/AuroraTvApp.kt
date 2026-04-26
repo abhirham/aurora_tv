@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -63,7 +65,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -76,6 +82,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -118,6 +125,29 @@ private val TvSelectKeys = setOf(
     Key.Enter,
     Key.NumPadEnter,
 )
+
+private fun Modifier.dpadFocusRoute(
+    up: FocusRequester? = null,
+    down: FocusRequester? = null,
+): Modifier = onPreviewKeyEvent { event ->
+    if (event.type != KeyEventType.KeyDown) {
+        false
+    } else {
+        when (event.key) {
+            Key.DirectionUp -> up?.let {
+                it.requestFocus()
+                true
+            } ?: false
+
+            Key.DirectionDown -> down?.let {
+                it.requestFocus()
+                true
+            } ?: false
+
+            else -> false
+        }
+    }
+}
 
 private enum class FocusTreatment {
     Filled,
@@ -309,12 +339,29 @@ private fun StreamingTopNav(
     syncMessage: String?,
     onRefresh: () -> Unit,
 ) {
+    val searchFocusRequester = remember { FocusRequester() }
+    val homeFocusRequester = remember { FocusRequester() }
+    val liveFocusRequester = remember { FocusRequester() }
+    val moviesFocusRequester = remember { FocusRequester() }
+    val seriesFocusRequester = remember { FocusRequester() }
+    val settingsFocusRequester = remember { FocusRequester() }
     val tabs = listOf(
-        LibrarySection.HOME to "Home",
-        LibrarySection.LIVE to "Live TV",
-        LibrarySection.MOVIES to "Movies",
-        LibrarySection.SERIES to "Series",
+        Triple(LibrarySection.HOME, "Home", homeFocusRequester),
+        Triple(LibrarySection.LIVE, "Live TV", liveFocusRequester),
+        Triple(LibrarySection.MOVIES, "Movies", moviesFocusRequester),
+        Triple(LibrarySection.SERIES, "Series", seriesFocusRequester),
     )
+    LaunchedEffect(selected) {
+        delay(50)
+        when (selected) {
+            LibrarySection.SEARCH -> searchFocusRequester
+            LibrarySection.HOME -> homeFocusRequester
+            LibrarySection.LIVE -> liveFocusRequester
+            LibrarySection.MOVIES -> moviesFocusRequester
+            LibrarySection.SERIES -> seriesFocusRequester
+            LibrarySection.SETTINGS -> settingsFocusRequester
+        }.requestFocus()
+    }
 
     Row(
         modifier = Modifier
@@ -349,26 +396,32 @@ private fun StreamingTopNav(
         }
 
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .focusRestorer()
+                .focusGroup(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TopNavIconOnly(
                 icon = Icons.Rounded.Search,
                 selected = selected == LibrarySection.SEARCH,
+                focusRequester = searchFocusRequester,
                 onClick = { onSelected(LibrarySection.SEARCH) },
             )
             Spacer(Modifier.width(10.dp))
-            tabs.forEach { (section, label) ->
+            tabs.forEach { (section, label, focusRequester) ->
                 TopNavItem(
                     label = label,
                     selected = selected == section,
+                    focusRequester = focusRequester,
                     onClick = { onSelected(section) },
                 )
             }
             TopNavItem(
                 label = "Settings",
                 selected = selected == LibrarySection.SETTINGS,
+                focusRequester = settingsFocusRequester,
                 onClick = { onSelected(LibrarySection.SETTINGS) },
             )
         }
@@ -402,6 +455,7 @@ private fun StreamingTopNav(
 private fun TopNavItem(
     label: String,
     selected: Boolean,
+    focusRequester: FocusRequester,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -413,6 +467,7 @@ private fun TopNavItem(
     val contentColor = if (focused) Color.Black else Color.White
     Row(
         modifier = Modifier
+            .focusRequester(focusRequester)
             .height(34.dp)
             .clip(RoundedCornerShape(34.dp))
             .background(backgroundColor)
@@ -444,6 +499,7 @@ private fun TopNavItem(
 private fun TopNavIconOnly(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
+    focusRequester: FocusRequester,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -455,6 +511,7 @@ private fun TopNavIconOnly(
     val contentColor = if (focused) Color.Black else Color.White
     Box(
         modifier = Modifier
+            .focusRequester(focusRequester)
             .size(width = 38.dp, height = 34.dp)
             .clip(RoundedCornerShape(34.dp))
             .background(backgroundColor)
@@ -666,6 +723,12 @@ private fun SetupScreen(
     var username by rememberSaveable { mutableStateOf(settings.providerUsername) }
     var password by rememberSaveable { mutableStateOf(settings.providerPassword) }
     val canConnect = baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+    val setupActionFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        setupActionFocusRequester.requestFocus()
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -728,20 +791,18 @@ private fun SetupScreen(
                         label = { Text("Password") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        visualTransformation = PasswordVisualTransformation(),
                         colors = darkTextFieldColors(),
                     )
-                    TvActionButton(
+                    SetupActionButton(
                         onClick = { onSave(baseUrl, username, password) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         enabled = canConnect,
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(if (canConnect) "Connect And Sync" else "Enter Details To Connect")
-                    }
+                        focusRequester = setupActionFocusRequester,
+                        label = if (canConnect) "Connect And Sync" else "Enter Details To Connect",
+                    )
                 }
             }
         }
@@ -888,25 +949,20 @@ private fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(262.dp),
+                    .height(262.dp)
+                    .focusRestorer()
+                    .focusGroup(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 primaryRowCards.forEach { item ->
                     val itemKey = item.focusKey
                     val expanded = expandedPrimaryItemKey == itemKey
-                    val tileModifier = if (expanded) {
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    } else {
-                        Modifier
-                            .width(178.dp)
-                            .fillMaxHeight()
-                    }
                     NetflixPrimaryTile(
                         item = item,
                         expanded = expanded,
-                        modifier = tileModifier,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                         onFocused = { highlightedItem = item },
                         onFocusChanged = { focused ->
                             expandedPrimaryItemKey = if (focused) itemKey else expandedPrimaryItemKey.takeUnless { it == itemKey }
@@ -961,7 +1017,10 @@ private fun NetflixSmallRail(
             Spacer(Modifier.height(112.dp))
         } else {
             LazyRow(
-                modifier = Modifier.height(112.dp),
+                modifier = Modifier
+                    .height(112.dp)
+                    .focusRestorer()
+                    .focusGroup(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(end = 32.dp),
             ) {
@@ -1355,6 +1414,9 @@ private fun LiveTvScreen(
         highlightedChannel?.streamId?.let(viewModel::observeGuide) ?: flowOf(emptyList())
     }
     val guide by guideFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val liveRailFocusRequester = remember { FocusRequester() }
+    val liveHeroPlayFocusRequester = remember { FocusRequester() }
+    val liveGuideFocusRequester = remember { FocusRequester() }
 
     Row(
         modifier = Modifier.fillMaxSize(),
@@ -1367,6 +1429,8 @@ private fun LiveTvScreen(
             categories = categories,
             selectedCategoryId = selectedCategoryId,
             onCategorySelected = { selectedCategoryId = it.remoteId },
+            focusRequester = liveRailFocusRequester,
+            rightFocusRequester = liveGuideFocusRequester,
         )
 
         Column(
@@ -1381,6 +1445,7 @@ private fun LiveTvScreen(
                     .weight(1f),
                 channel = highlightedChannel,
                 guide = guide,
+                playFocusRequester = liveHeroPlayFocusRequester,
                 onPlay = { highlightedChannel?.let { onPlayChannel(it, selectedCategoryId) } },
             )
 
@@ -1391,6 +1456,9 @@ private fun LiveTvScreen(
                 channels = channels,
                 highlightedChannel = highlightedChannel,
                 guide = guide,
+                railFocusRequester = liveRailFocusRequester,
+                heroFocusRequester = liveHeroPlayFocusRequester,
+                initialFocusRequester = liveGuideFocusRequester,
                 onChannelFocused = { focusedChannelId = it.streamId },
                 onPlayChannel = { onPlayChannel(it, selectedCategoryId) },
             )
@@ -1404,6 +1472,8 @@ private fun MockupLiveRail(
     categories: List<CategoryEntity>,
     selectedCategoryId: String?,
     onCategorySelected: (CategoryEntity) -> Unit,
+    focusRequester: FocusRequester,
+    rightFocusRequester: FocusRequester,
 ) {
     Surface(
         modifier = modifier,
@@ -1411,7 +1481,10 @@ private fun MockupLiveRail(
         color = Color(0xFF0D0D0D),
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier
+                .padding(10.dp)
+                .focusRestorer()
+                .focusGroup(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val selectedCategory = categories.firstOrNull { it.remoteId == selectedCategoryId }
@@ -1419,6 +1492,8 @@ private fun MockupLiveRail(
                 label = "Live",
                 selected = true,
                 icon = Icons.Rounded.LiveTv,
+                focusRequester = focusRequester,
+                rightFocusRequester = rightFocusRequester,
                 onClick = { selectedCategory?.let(onCategorySelected) },
             )
             categories.take(8).forEach { category ->
@@ -1426,6 +1501,7 @@ private fun MockupLiveRail(
                     label = category.name,
                     selected = selectedCategoryId == category.remoteId,
                     icon = Icons.Rounded.Tv,
+                    rightFocusRequester = rightFocusRequester,
                     onClick = { onCategorySelected(category) },
                 )
             }
@@ -1433,6 +1509,7 @@ private fun MockupLiveRail(
                 label = "Favorites",
                 selected = false,
                 icon = Icons.Rounded.Favorite,
+                rightFocusRequester = rightFocusRequester,
                 onClick = {},
             )
         }
@@ -1444,13 +1521,21 @@ private fun MockupRailItem(
     label: String,
     selected: Boolean,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    focusRequester: FocusRequester? = null,
+    rightFocusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
     FocusCard(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp),
+            .height(72.dp)
+            .then(
+                rightFocusRequester?.let { requester ->
+                    Modifier.focusProperties { right = requester }
+                } ?: Modifier,
+            ),
         selected = selected,
+        focusRequester = focusRequester,
         onClick = onClick,
     ) {
         Column(
@@ -1479,6 +1564,7 @@ private fun MockupLiveHero(
     modifier: Modifier,
     channel: ChannelEntity?,
     guide: List<EpgEventEntity>,
+    playFocusRequester: FocusRequester,
     onPlay: () -> Unit,
 ) {
     val now = System.currentTimeMillis()
@@ -1580,10 +1666,16 @@ private fun MockupLiveHero(
                 }
 
                 Spacer(Modifier.height(26.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    modifier = Modifier
+                        .focusRestorer()
+                        .focusGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
                     TvActionButton(
                         onClick = onPlay,
                         enabled = channel != null,
+                        focusRequester = playFocusRequester,
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 34.dp, vertical = 16.dp),
                     ) {
@@ -1613,17 +1705,14 @@ private fun MockupEpgGrid(
     channels: List<ChannelEntity>,
     highlightedChannel: ChannelEntity?,
     guide: List<EpgEventEntity>,
+    railFocusRequester: FocusRequester,
+    heroFocusRequester: FocusRequester,
+    initialFocusRequester: FocusRequester,
     onChannelFocused: (ChannelEntity) -> Unit,
     onPlayChannel: (ChannelEntity) -> Unit,
 ) {
     val now = System.currentTimeMillis()
-    val rows = remember(channels, highlightedChannel) {
-        val selected = highlightedChannel
-        buildList {
-            if (selected != null) add(selected)
-            channels.filterNot { it.streamId == selected?.streamId }.take(4).forEach(::add)
-        }
-    }
+    val rows = remember(channels) { channels }
 
     Column(modifier = modifier) {
         Row(
@@ -1639,17 +1728,29 @@ private fun MockupEpgGrid(
         if (rows.isEmpty()) {
             EmptyState("No channels in this group")
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(rows, key = { it.streamId }) { channel ->
+            LazyColumn(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                itemsIndexed(rows, key = { _, channel -> channel.streamId }) { rowIndex, channel ->
                     val selected = channel.streamId == highlightedChannel?.streamId
                     Row(
                         modifier = Modifier.height(62.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         FocusCard(
-                            modifier = Modifier.width(230.dp).fillMaxHeight(),
+                            modifier = Modifier
+                                .width(230.dp)
+                                .fillMaxHeight()
+                                .focusProperties {
+                                    left = railFocusRequester
+                                    if (rowIndex == 0) up = heroFocusRequester
+                                },
                             selected = selected,
                             focusTreatment = FocusTreatment.Outline,
+                            focusRequester = if (rowIndex == 0) initialFocusRequester else null,
                             onClick = { onPlayChannel(channel) },
                             onFocused = { onChannelFocused(channel) },
                         ) {
@@ -1677,10 +1778,17 @@ private fun MockupEpgGrid(
                         repeat(4) { index ->
                             val event = events.getOrNull(index)
                             val current = event != null && now in event.startEpochMillis until event.endEpochMillis
-                            Surface(
-                                modifier = Modifier.weight(1f).fillMaxHeight(),
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (current) NetflixRed.copy(alpha = 0.24f) else Color(0xFF191919),
+                            FocusCard(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .focusProperties {
+                                        if (rowIndex == 0) up = heroFocusRequester
+                                    },
+                                selected = current,
+                                focusTreatment = FocusTreatment.Outline,
+                                onClick = { onPlayChannel(channel) },
+                                onFocused = { onChannelFocused(channel) },
                             ) {
                                 Column(
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -1743,7 +1851,12 @@ private fun MovieScreen(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyRow(
+            modifier = Modifier
+                .focusRestorer()
+                .focusGroup(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
                 FocusCard(
                     modifier = Modifier.height(48.dp),
@@ -1775,6 +1888,9 @@ private fun MovieScreen(
                     EmptyState("No movies available in this group")
                 } else {
                     LazyVerticalGrid(
+                        modifier = Modifier
+                            .focusRestorer()
+                            .focusGroup(),
                         columns = GridCells.Adaptive(150.dp),
                         contentPadding = PaddingValues(2.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -1872,6 +1988,9 @@ private fun SeriesScreen(
                 EmptyState("No series available in this group")
             } else {
                 LazyVerticalGrid(
+                    modifier = Modifier
+                        .focusRestorer()
+                        .focusGroup(),
                     columns = GridCells.Adaptive(170.dp),
                     contentPadding = PaddingValues(18.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -2004,7 +2123,12 @@ private fun CompactMediaDetailPanel(
             }
             Text(body, color = MutedText, maxLines = 5, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 TvActionButton(
                     onClick = onPrimary,
                     shape = RoundedCornerShape(6.dp),
@@ -2035,12 +2159,36 @@ private fun SearchScreen(
 ) {
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
     val results by viewModel.searchResults.collectAsStateWithLifecycle()
+    val searchFieldFocusRequester = remember { FocusRequester() }
+    val firstResultFocusRequester = remember { FocusRequester() }
+    val firstResultSection = when {
+        results.channels.isNotEmpty() -> "Channels"
+        results.movies.isNotEmpty() -> "Movies"
+        results.series.isNotEmpty() -> "Series"
+        else -> null
+    }
+    val hasSearchResults = firstResultSection != null
 
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         OutlinedTextField(
             value = query,
             onValueChange = viewModel::updateSearchQuery,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(searchFieldFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (
+                        event.type == KeyEventType.KeyDown &&
+                        event.key == Key.DirectionDown &&
+                        query.isNotBlank() &&
+                        hasSearchResults
+                    ) {
+                        firstResultFocusRequester.requestFocus()
+                        true
+                    } else {
+                        false
+                    }
+                },
             label = { Text("Search live TV, movies, and series") },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             singleLine = true,
@@ -2050,41 +2198,57 @@ private fun SearchScreen(
         if (query.isBlank()) {
             EmptyState("Start typing to search your synced provider catalog")
         } else {
-            SearchResultSection("Channels", results.channels) { item ->
-                onPlay(item.targetType, item.targetId)
-            }
-            SearchResultSection("Movies", results.movies) { item ->
-                onOpenMovie(
-                    MovieEntity(
-                        streamId = item.targetId.toLong(),
-                        categoryRemoteId = "",
-                        name = item.title,
-                        artworkUrl = item.artworkUrl,
-                        plot = null,
-                        rating = null,
-                        releaseYear = item.subtitle,
-                        containerExtension = null,
-                        directSource = null,
-                        isAdult = settings.adultContentEnabled,
-                        addedAt = null,
-                    ),
-                )
-            }
-            SearchResultSection("Series", results.series) { item ->
-                onOpenSeries(
-                    SeriesEntity(
-                        seriesId = item.targetId.toLong(),
-                        categoryRemoteId = "",
-                        name = item.title,
-                        artworkUrl = item.artworkUrl,
-                        plot = null,
-                        rating = null,
-                        releaseYear = item.subtitle,
-                        isAdult = settings.adultContentEnabled,
-                        addedAt = null,
-                    ),
-                )
-            }
+            SearchResultSection(
+                title = "Channels",
+                items = results.channels,
+                firstItemFocusRequester = if (firstResultSection == "Channels") firstResultFocusRequester else null,
+                upFocusRequester = searchFieldFocusRequester,
+                onClick = { item -> onPlay(item.targetType, item.targetId) },
+            )
+            SearchResultSection(
+                title = "Movies",
+                items = results.movies,
+                firstItemFocusRequester = if (firstResultSection == "Movies") firstResultFocusRequester else null,
+                upFocusRequester = searchFieldFocusRequester,
+                onClick = { item ->
+                    onOpenMovie(
+                        MovieEntity(
+                            streamId = item.targetId.toLong(),
+                            categoryRemoteId = "",
+                            name = item.title,
+                            artworkUrl = item.artworkUrl,
+                            plot = null,
+                            rating = null,
+                            releaseYear = item.subtitle,
+                            containerExtension = null,
+                            directSource = null,
+                            isAdult = settings.adultContentEnabled,
+                            addedAt = null,
+                        ),
+                    )
+                },
+            )
+            SearchResultSection(
+                title = "Series",
+                items = results.series,
+                firstItemFocusRequester = if (firstResultSection == "Series") firstResultFocusRequester else null,
+                upFocusRequester = searchFieldFocusRequester,
+                onClick = { item ->
+                    onOpenSeries(
+                        SeriesEntity(
+                            seriesId = item.targetId.toLong(),
+                            categoryRemoteId = "",
+                            name = item.title,
+                            artworkUrl = item.artworkUrl,
+                            plot = null,
+                            rating = null,
+                            releaseYear = item.subtitle,
+                            isAdult = settings.adultContentEnabled,
+                            addedAt = null,
+                        ),
+                    )
+                },
+            )
         }
     }
 }
@@ -2093,6 +2257,8 @@ private fun SearchScreen(
 private fun SearchResultSection(
     title: String,
     items: List<SearchResultItem>,
+    firstItemFocusRequester: FocusRequester? = null,
+    upFocusRequester: FocusRequester,
     onClick: (SearchResultItem) -> Unit,
 ) {
     if (items.isEmpty()) return
@@ -2109,11 +2275,19 @@ private fun SearchResultSection(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(14.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(items, key = { "${it.targetType.rawValue}:${it.targetId}" }) { item ->
+                LazyRow(
+                    modifier = Modifier
+                        .focusRestorer()
+                        .focusGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    itemsIndexed(items, key = { _, item -> "${item.targetType.rawValue}:${item.targetId}" }) { index, item ->
                         FocusCard(
-                            modifier = Modifier.width(172.dp),
+                            modifier = Modifier
+                                .width(172.dp)
+                                .focusProperties { up = upFocusRequester },
                             focusTreatment = FocusTreatment.Outline,
+                            focusRequester = if (index == 0) firstItemFocusRequester else null,
                             onClick = { onClick(item) },
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -2160,6 +2334,22 @@ private fun SettingsScreen(
     var password by rememberSaveable { mutableStateOf(settings.providerPassword) }
     var epgHours by rememberSaveable { mutableStateOf(settings.epgWindowHours.toString()) }
     var pin by rememberSaveable { mutableStateOf(settings.parentalPin) }
+    val baseUrlFocusRequester = remember { FocusRequester() }
+    val usernameFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val connectFocusRequester = remember { FocusRequester() }
+    val autoSyncFocusRequester = remember { FocusRequester() }
+    val adultContentFocusRequester = remember { FocusRequester() }
+    val epgHoursFocusRequester = remember { FocusRequester() }
+    val pinFocusRequester = remember { FocusRequester() }
+    val preferredPlayerFocusRequester = remember { FocusRequester() }
+    val bufferProfileFocusRequester = remember { FocusRequester() }
+    val refreshFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(90)
+        connectFocusRequester.requestFocus()
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -2169,20 +2359,35 @@ private fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+                .padding(start = 24.dp, top = 30.dp, end = 24.dp, bottom = 24.dp),
         ) {
             Text(
                 text = "Playback And Provider Settings",
-                style = MaterialTheme.typography.displaySmall,
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .focusRestorer()
+                    .focusGroup(),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
 
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(baseUrlFocusRequester)
+                    .dpadFocusRoute(down = usernameFocusRequester),
                 label = { Text("Provider URL") },
                 singleLine = true,
                 colors = darkTextFieldColors(),
@@ -2190,7 +2395,10 @@ private fun SettingsScreen(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(usernameFocusRequester)
+                    .dpadFocusRoute(up = baseUrlFocusRequester, down = passwordFocusRequester),
                 label = { Text("Username") },
                 singleLine = true,
                 colors = darkTextFieldColors(),
@@ -2198,16 +2406,27 @@ private fun SettingsScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(passwordFocusRequester)
+                    .dpadFocusRoute(up = usernameFocusRequester, down = connectFocusRequester),
                 label = { Text("Password") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = PasswordVisualTransformation(),
                 colors = darkTextFieldColors(),
             )
 
             TvActionButton(
                 onClick = { onSaveProvider(baseUrl, username, password) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusProperties {
+                        up = passwordFocusRequester
+                        down = autoSyncFocusRequester
+                    },
                 enabled = !isSyncing && baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+                focusRequester = connectFocusRequester,
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Icon(Icons.Rounded.PlayArrow, contentDescription = null)
@@ -2219,6 +2438,11 @@ private fun SettingsScreen(
                 label = "Auto Sync Library",
                 description = "Refresh the local database every 12 hours in the background.",
                 checked = settings.autoSyncEnabled,
+                modifier = Modifier.focusProperties {
+                    up = connectFocusRequester
+                    down = adultContentFocusRequester
+                },
+                focusRequester = autoSyncFocusRequester,
                 onCheckedChange = onAutoSyncChanged,
             )
 
@@ -2226,6 +2450,11 @@ private fun SettingsScreen(
                 label = "Show Adult Content",
                 description = "Allows groups and titles marked as adult to be displayed.",
                 checked = settings.adultContentEnabled,
+                modifier = Modifier.focusProperties {
+                    up = autoSyncFocusRequester
+                    down = epgHoursFocusRequester
+                },
+                focusRequester = adultContentFocusRequester,
                 onCheckedChange = onAdultContentChanged,
             )
 
@@ -2235,7 +2464,10 @@ private fun SettingsScreen(
                     epgHours = it.filter(Char::isDigit).take(2)
                     it.toIntOrNull()?.let(onEpgWindowChanged)
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(epgHoursFocusRequester)
+                    .dpadFocusRoute(up = adultContentFocusRequester, down = pinFocusRequester),
                 label = { Text("EPG Window Hours") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -2248,18 +2480,32 @@ private fun SettingsScreen(
                     pin = it.filter(Char::isDigit).take(4)
                     onPinChanged(pin)
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(pinFocusRequester)
+                    .dpadFocusRoute(up = epgHoursFocusRequester, down = preferredPlayerFocusRequester),
                 label = { Text("Parental PIN") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
                 colors = darkTextFieldColors(),
             )
 
             Text("Preferred Player", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 PlayerPreferenceButton(
                     selected = settings.preferredPlayer == PreferredPlayer.INTERNAL,
                     label = "Internal",
+                    modifier = Modifier.focusProperties {
+                        up = pinFocusRequester
+                        down = bufferProfileFocusRequester
+                    },
+                    focusRequester = preferredPlayerFocusRequester,
                     onClick = { onPreferredPlayerChanged(PreferredPlayer.INTERNAL) },
                 )
                 PlayerPreferenceButton(
@@ -2270,10 +2516,20 @@ private fun SettingsScreen(
             }
 
             Text("Buffer Profile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 PlayerPreferenceButton(
                     selected = settings.bufferProfile == BufferProfile.LOW_LATENCY,
                     label = "Low Latency",
+                    modifier = Modifier.focusProperties {
+                        up = preferredPlayerFocusRequester
+                        down = refreshFocusRequester
+                    },
+                    focusRequester = bufferProfileFocusRequester,
                     onClick = { onBufferProfileChanged(BufferProfile.LOW_LATENCY) },
                 )
                 PlayerPreferenceButton(
@@ -2291,11 +2547,14 @@ private fun SettingsScreen(
             TvActionButton(
                 onClick = onRefresh,
                 enabled = !isSyncing,
+                focusRequester = refreshFocusRequester,
+                modifier = Modifier.focusProperties { up = bufferProfileFocusRequester },
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(if (isSyncing) "Syncing..." else "Refresh Library Now")
+            }
             }
         }
     }
@@ -2306,11 +2565,16 @@ private fun SettingToggleRow(
     label: String,
     description: String,
     checked: Boolean,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = PanelRaised.copy(alpha = 0.86f),
+    FocusCard(
+        modifier = modifier.fillMaxWidth(),
+        selected = checked,
+        focusTreatment = FocusTreatment.Outline,
+        focusRequester = focusRequester,
+        onClick = { onCheckedChange(!checked) },
     ) {
         Row(
             modifier = Modifier
@@ -2323,8 +2587,62 @@ private fun SettingToggleRow(
                 Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(description, color = MutedText)
             }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                modifier = Modifier.focusProperties { canFocus = false },
+            )
         }
+    }
+}
+
+@Composable
+private fun SetupActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean,
+    focusRequester: FocusRequester,
+    label: String,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val backgroundColor = when {
+        focused -> Color.White
+        enabled -> NetflixRed
+        else -> Color(0xFF3A3A3A)
+    }
+    val contentColor = when {
+        focused -> Color.Black
+        enabled -> Color.White
+        else -> MutedText
+    }
+
+    Row(
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp && enabled) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = contentColor)
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(label, color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -2332,11 +2650,14 @@ private fun SettingToggleRow(
 private fun PlayerPreferenceButton(
     selected: Boolean,
     label: String,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
     FocusCard(
-        modifier = Modifier.width(190.dp),
+        modifier = modifier.width(190.dp),
         selected = selected,
+        focusRequester = focusRequester,
         onClick = onClick,
     ) {
         Box(
@@ -2530,6 +2851,9 @@ private fun LiveCategoryColumn(
             Text("Live TV", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             Spacer(Modifier.height(12.dp))
             LazyColumn(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
@@ -2569,6 +2893,9 @@ private fun LiveChannelColumn(
             EmptyState("No channels in this group")
         } else {
             LazyColumn(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
                 contentPadding = PaddingValues(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -2703,7 +3030,10 @@ private fun CategoryRail(
                     modifier = Modifier.padding(20.dp),
                 )
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRestorer()
+                        .focusGroup(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -2969,6 +3299,13 @@ private fun MovieDialog(
     onDismiss: () -> Unit,
     onPlay: () -> Unit,
 ) {
+    val playFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(movie.streamId) {
+        delay(50)
+        playFocusRequester.requestFocus()
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -2976,7 +3313,9 @@ private fun MovieDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.74f)
-                .fillMaxHeight(0.72f),
+                .fillMaxHeight(0.72f)
+                .focusRestorer()
+                .focusGroup(),
             shape = RoundedCornerShape(8.dp),
             color = Color(0xF2111111),
         ) {
@@ -2998,9 +3337,15 @@ private fun MovieDialog(
                     )
                     Text(movie.plot ?: "No plot available.", style = MaterialTheme.typography.bodyLarge, color = MutedText, maxLines = 7, overflow = TextOverflow.Ellipsis)
                     Spacer(modifier = Modifier.weight(1f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .focusRestorer()
+                            .focusGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         TvActionButton(
                             onClick = onPlay,
+                            focusRequester = playFocusRequester,
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 30.dp, vertical = 12.dp),
                         ) {
@@ -3045,52 +3390,86 @@ private fun SeriesDialog(
     val episodes by viewModel.observeEpisodes(series.seriesId).collectAsStateWithLifecycle(initialValue = emptyList())
     val seasons = remember(episodes) { episodes.groupBy { it.seasonNumber }.toSortedMap() }
     var selectedSeason by rememberSaveable { mutableStateOf(seasons.keys.firstOrNull() ?: 1) }
+    val activeSeasonFocusRequester = remember { FocusRequester() }
+    val firstEpisodeFocusRequester = remember { FocusRequester() }
+    val lastEpisodeFocusRequester = remember { FocusRequester() }
+    val favoriteSeriesFocusRequester = remember { FocusRequester() }
     LaunchedEffect(seasons.keys.toList()) {
         if (selectedSeason !in seasons.keys) {
             selectedSeason = seasons.keys.firstOrNull() ?: 1
         }
+        if (seasons.isNotEmpty()) {
+            delay(50)
+            activeSeasonFocusRequester.requestFocus()
+        }
     }
+    val selectedEpisodes = seasons[selectedSeason].orEmpty()
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.88f),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            Row(modifier = Modifier.fillMaxSize().padding(26.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .fillMaxHeight(0.92f)
+                    .focusRestorer()
+                    .focusGroup(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+            Row(modifier = Modifier.fillMaxSize().padding(22.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                 Artwork(
                     url = series.artworkUrl,
                     modifier = Modifier
-                        .width(300.dp)
+                        .width(280.dp)
                         .fillMaxHeight(),
                     shape = RoundedCornerShape(8.dp),
                 )
 
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(series.name, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        series.name,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         series.releaseYear ?: series.rating ?: "Series",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MutedText,
                     )
-                    Text(series.plot ?: "Episode details are loaded on demand from the provider.", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        series.plot ?: "Episode details are loaded on demand from the provider.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
 
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LazyRow(
+                        modifier = Modifier
+                            .focusRestorer()
+                            .focusGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         items(seasons.keys.toList()) { season ->
                             FocusCard(
-                                modifier = Modifier.width(140.dp),
+                                modifier = Modifier
+                                    .width(132.dp)
+                                    .focusProperties {
+                                        if (season == selectedSeason && selectedEpisodes.isNotEmpty()) {
+                                            down = firstEpisodeFocusRequester
+                                        }
+                                    },
                                 selected = season == selectedSeason,
+                                focusRequester = if (season == selectedSeason) activeSeasonFocusRequester else null,
                                 onClick = { selectedSeason = season },
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 16.dp),
+                                        .padding(vertical = 12.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text("Season $season", fontWeight = FontWeight.Bold)
@@ -3110,39 +3489,58 @@ private fun SeriesDialog(
                             }
                         } else {
                             LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .focusRestorer()
+                                    .focusGroup(),
+                                contentPadding = PaddingValues(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                items(seasons[selectedSeason].orEmpty(), key = { it.episodeId }) { episode ->
+                                itemsIndexed(selectedEpisodes, key = { _, episode -> episode.episodeId }) { index, episode ->
+                                    val episodeFocusRequester = when {
+                                        index == 0 -> firstEpisodeFocusRequester
+                                        index == selectedEpisodes.lastIndex -> lastEpisodeFocusRequester
+                                        else -> null
+                                    }
                                     FocusCard(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(96.dp)
+                                            .focusProperties {
+                                                if (index == 0) up = activeSeasonFocusRequester
+                                                if (index == selectedEpisodes.lastIndex) down = favoriteSeriesFocusRequester
+                                            },
                                         focusTreatment = FocusTreatment.Outline,
+                                        focusRequester = episodeFocusRequester,
                                         onClick = { onPlayEpisode(episode) },
                                     ) {
                                         Row(
                                             modifier = Modifier
+                                                .fillMaxSize()
                                                 .fillMaxWidth()
-                                                .padding(14.dp),
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Artwork(
                                                 url = episode.artworkUrl ?: series.artworkUrl,
-                                                modifier = Modifier.size(72.dp),
+                                                modifier = Modifier.size(60.dp),
                                                 shape = RoundedCornerShape(8.dp),
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = "E${episode.episodeNumber}  ${episode.title}",
                                                     fontWeight = FontWeight.Bold,
-                                                    maxLines = 2,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
                                                 )
                                                 episode.plot?.takeIf(String::isNotBlank)?.let {
                                                     Text(
                                                         text = it,
                                                         color = MutedText,
-                                                        maxLines = 2,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
                                                 }
@@ -3164,7 +3562,13 @@ private fun SeriesDialog(
                                 artworkUrl = series.artworkUrl,
                             )
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusProperties {
+                                up = if (selectedEpisodes.size > 1) lastEpisodeFocusRequester else firstEpisodeFocusRequester
+                            },
+                        focusRequester = favoriteSeriesFocusRequester,
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                     ) {
                         Text("Favorite Series")
                     }
@@ -3195,7 +3599,12 @@ private fun HomeStrip(
             if (items.isEmpty()) {
                 EmptyState("Nothing here yet")
             } else {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                LazyRow(
+                    modifier = Modifier
+                        .focusRestorer()
+                        .focusGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
                     items(items, key = { "${it.targetType.rawValue}:${it.id}" }) { item ->
                         FocusCard(
                             modifier = Modifier.width(176.dp),
@@ -3234,6 +3643,7 @@ private fun FocusCard(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     focusTreatment: FocusTreatment = FocusTreatment.Filled,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
     onFocused: () -> Unit = {},
     content: @Composable () -> Unit,
@@ -3254,6 +3664,7 @@ private fun FocusCard(
 
     Surface(
         modifier = modifier
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
@@ -3288,6 +3699,7 @@ private fun TvActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    focusRequester: FocusRequester? = null,
     shape: RoundedCornerShape = RoundedCornerShape(8.dp),
     containerColor: Color = NetflixRed,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
@@ -3298,7 +3710,9 @@ private fun TvActionButton(
 
     Button(
         onClick = onClick,
-        modifier = modifier.onFocusChanged { focused = it.isFocused },
+        modifier = modifier
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+            .onFocusChanged { focused = it.isFocused },
         enabled = enabled,
         shape = shape,
         colors = ButtonDefaults.buttonColors(

@@ -6,4 +6,5 @@
     <color name="aurora_copper">#FF8A3D</color>
     <color name="aurora_sand">#F4E5CF</color>
     <color name="aurora_red">#FF6471</color>
+    <color name="launcher_icon_background">#000000</color>
 </resources>
