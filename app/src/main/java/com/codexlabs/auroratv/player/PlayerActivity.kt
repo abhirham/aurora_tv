@@ -10,6 +10,9 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -45,6 +48,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +79,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.Flow
@@ -95,6 +100,11 @@ private val TvSelectKeys = setOf(
     Key.Enter,
     Key.NumPadEnter,
 )
+
+private const val SEEK_STEP_MS = 10_000L
+private const val SEEK_REPEAT_INITIAL_DELAY_MS = 500L
+private const val SEEK_REPEAT_INTERVAL_MS = 100L
+private const val PLAYBACK_PROGRESS_UPDATE_MS = 100L
 
 class PlayerActivity : ComponentActivity() {
     companion object {
@@ -127,6 +137,8 @@ class PlayerActivity : ComponentActivity() {
     private var errorMessage by mutableStateOf<String?>(null)
     private var revealOverlayKeyUpCode: Int? = null
     private var overlayActivityTick by mutableIntStateOf(0)
+    private var remoteSeekKeyCode: Int? = null
+    private var remoteSeekRepeatJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -164,8 +176,8 @@ class PlayerActivity : ComponentActivity() {
                     overlayActivityTick = overlayActivityTick,
                     errorMessage = errorMessage,
                     onHideOverlay = { overlayVisible = false },
-                    onSeekBack = { repeatCount -> seekBy(-seekStepForRepeat(repeatCount)) },
-                    onSeekForward = { repeatCount -> seekBy(seekStepForRepeat(repeatCount)) },
+                    onSeekBack = { seekBy(-SEEK_STEP_MS) },
+                    onSeekForward = { seekBy(SEEK_STEP_MS) },
                     onTogglePlayPause = {
                         if (player.isPlaying) player.pause() else player.play()
                     },
@@ -181,6 +193,11 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_UP && event.keyCode == remoteSeekKeyCode) {
+            stopRemoteSeekRepeat()
+            return true
+        }
+
         if (event.action == KeyEvent.ACTION_UP && event.keyCode == revealOverlayKeyUpCode) {
             revealOverlayKeyUpCode = null
             return true
@@ -190,7 +207,20 @@ class PlayerActivity : ComponentActivity() {
             return super.dispatchKeyEvent(event)
         }
 
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (overlayVisible) {
+                overlayVisible = false
+                revealOverlayKeyUpCode = event.keyCode
+            } else {
+                finish()
+            }
+            return true
+        }
+
         activeDescriptor ?: return super.dispatchKeyEvent(event)
+        if (startRemoteSeekRepeatIfNeeded(event)) {
+            return true
+        }
         if (overlayVisible) {
             noteOverlayActivity()
         }
@@ -227,6 +257,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        stopRemoteSeekRepeat()
         persistProgress()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || !isInPictureInPictureMode) {
             player.pause()
@@ -235,6 +266,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopRemoteSeekRepeat()
         persistProgress()
         mediaSession?.release()
         player.release()
@@ -310,13 +342,43 @@ class PlayerActivity : ComponentActivity() {
         player.seekTo(newPosition)
     }
 
-    private fun seekStepForRepeat(repeatCount: Int): Long {
-        return when {
-            repeatCount >= 18 -> 60_000L
-            repeatCount >= 10 -> 30_000L
-            repeatCount >= 4 -> 15_000L
-            else -> 10_000L
+    private fun startRemoteSeekRepeatIfNeeded(event: KeyEvent): Boolean {
+        val descriptor = activeDescriptor ?: return false
+        if (descriptor.isLive) return false
+        val deltaMs = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_MEDIA_REWIND,
+            -> -SEEK_STEP_MS
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+            -> SEEK_STEP_MS
+            else -> return false
         }
+        startRemoteSeekRepeat(event.keyCode, deltaMs)
+        return true
+    }
+
+    private fun startRemoteSeekRepeat(keyCode: Int, deltaMs: Long) {
+        if (remoteSeekKeyCode == keyCode && remoteSeekRepeatJob != null) return
+        stopRemoteSeekRepeat()
+        remoteSeekKeyCode = keyCode
+        overlayVisible = true
+        noteOverlayActivity()
+        seekBy(deltaMs)
+        remoteSeekRepeatJob = lifecycleScope.launch {
+            delay(SEEK_REPEAT_INITIAL_DELAY_MS)
+            while (true) {
+                seekBy(deltaMs)
+                noteOverlayActivity()
+                delay(SEEK_REPEAT_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopRemoteSeekRepeat() {
+        remoteSeekRepeatJob?.cancel()
+        remoteSeekRepeatJob = null
+        remoteSeekKeyCode = null
     }
 
     private fun startOver() {
@@ -376,8 +438,8 @@ private fun PlayerScreen(
     overlayActivityTick: Int,
     errorMessage: String?,
     onHideOverlay: () -> Unit,
-    onSeekBack: (Int) -> Unit,
-    onSeekForward: (Int) -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
     onTogglePlayPause: () -> Unit,
     onStartOver: () -> Unit,
     onNextEpisode: () -> Unit,
@@ -401,7 +463,7 @@ private fun PlayerScreen(
     val positionAndDuration by produceState(initialValue = 0L to 0L, descriptor?.targetId) {
         while (true) {
             value = player.currentPosition to (player.duration.takeIf { it > 0 } ?: 0L)
-            delay(1_000)
+            delay(PLAYBACK_PROGRESS_UPDATE_MS)
         }
     }
 
@@ -508,8 +570,8 @@ private fun PlayerOverlay(
     positionMs: Long,
     durationMs: Long,
     onTogglePlayPause: () -> Unit,
-    onSeekBack: (Int) -> Unit,
-    onSeekForward: (Int) -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
     onStartOver: () -> Unit,
     onNextEpisode: () -> Unit,
     onPrevChannel: () -> Unit,
@@ -671,6 +733,14 @@ private fun PlaybackProgressBar(
     } else {
         1f
     }
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(
+            durationMillis = PLAYBACK_PROGRESS_UPDATE_MS.toInt(),
+            easing = LinearEasing,
+        ),
+        label = "playback-progress",
+    )
     Box(
         modifier = modifier
             .height(4.dp)
@@ -687,7 +757,7 @@ private fun PlaybackProgressBar(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(if (isLive) 1f else progress)
+                    .fillMaxWidth(if (isLive) 1f else animatedProgress)
                     .height(4.dp)
                     .background(Color(0xFFE50914)),
             )
@@ -745,40 +815,67 @@ private fun TopPlayerAction(
 private fun LargeRoundPlayButton(
     isPlaying: Boolean,
     onClick: () -> Unit,
-    onSeekBack: (Int) -> Unit,
-    onSeekForward: (Int) -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
     seekEnabled: Boolean,
     focusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
-    var leftRepeatCount by remember { mutableIntStateOf(0) }
-    var rightRepeatCount by remember { mutableIntStateOf(0) }
+    var activeSeekDirection by remember { mutableIntStateOf(0) }
+    var seekRepeatJob by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun stopSeekRepeat(direction: Int? = null) {
+        if (direction == null || activeSeekDirection == direction) {
+            seekRepeatJob?.cancel()
+            seekRepeatJob = null
+            activeSeekDirection = 0
+        }
+    }
+
+    fun startSeekRepeat(direction: Int, seek: () -> Unit) {
+        if (activeSeekDirection == direction && seekRepeatJob != null) return
+        stopSeekRepeat()
+        activeSeekDirection = direction
+        seek()
+        seekRepeatJob = scope.launch {
+            delay(SEEK_REPEAT_INITIAL_DELAY_MS)
+            while (true) {
+                seek()
+                delay(SEEK_REPEAT_INTERVAL_MS)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { stopSeekRepeat() }
+    }
+
     Box(
         modifier = Modifier
             .size(82.dp)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .clip(RoundedCornerShape(82.dp))
             .background(if (focused) Color.White else Color.Transparent)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (!it.isFocused) stopSeekRepeat()
+            }
             .onPreviewKeyEvent { event ->
                 when {
                     seekEnabled && event.key == Key.DirectionLeft -> {
                         if (event.type == KeyEventType.KeyDown) {
-                            onSeekBack(leftRepeatCount)
-                            leftRepeatCount += 1
-                            rightRepeatCount = 0
+                            startSeekRepeat(-1, onSeekBack)
                         } else if (event.type == KeyEventType.KeyUp) {
-                            leftRepeatCount = 0
+                            stopSeekRepeat(-1)
                         }
                         true
                     }
                     seekEnabled && event.key == Key.DirectionRight -> {
                         if (event.type == KeyEventType.KeyDown) {
-                            onSeekForward(rightRepeatCount)
-                            rightRepeatCount += 1
-                            leftRepeatCount = 0
+                            startSeekRepeat(1, onSeekForward)
                         } else if (event.type == KeyEventType.KeyUp) {
-                            rightRepeatCount = 0
+                            stopSeekRepeat(1)
                         }
                         true
                     }

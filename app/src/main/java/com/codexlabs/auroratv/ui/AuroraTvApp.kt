@@ -150,8 +150,7 @@ fun AuroraTvApp(
                         Color(0xFF090909),
                     ),
                 ),
-            )
-            .padding(horizontal = 56.dp, vertical = 34.dp),
+            ),
     ) {
         if (!settings.isConfigured) {
             SetupScreen(
@@ -159,7 +158,11 @@ fun AuroraTvApp(
                 onSave = viewModel::saveProvider,
             )
         } else {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 38.dp, vertical = 18.dp),
+            ) {
                 StreamingTopNav(
                     selected = selectedSection,
                     onSelected = { selectedSection = it },
@@ -168,7 +171,7 @@ fun AuroraTvApp(
                     onRefresh = { viewModel.syncAll(force = true) },
                 )
 
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 when (selectedSection) {
                     LibrarySection.HOME -> HomeScreen(
@@ -309,22 +312,46 @@ private fun StreamingTopNav(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp),
+            .height(44.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = "Aurora TV",
-            color = NetflixRed,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-        )
+        Row(
+            modifier = Modifier.width(190.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF446CFF), Color(0xFF9E4DFF)),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("A", color = Color.White, fontWeight = FontWeight.Black)
+            }
+            Box(
+                modifier = Modifier
+                    .width(0.dp)
+                    .height(0.dp),
+            )
+        }
 
         Row(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TopNavIconOnly(
+                icon = Icons.Rounded.Search,
+                selected = selected == LibrarySection.SEARCH,
+                onClick = { onSelected(LibrarySection.SEARCH) },
+            )
+            Spacer(Modifier.width(10.dp))
             tabs.forEach { (section, label) ->
                 TopNavItem(
                     label = label,
@@ -332,42 +359,31 @@ private fun StreamingTopNav(
                     onClick = { onSelected(section) },
                 )
             }
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TopNavIconItem(
-                icon = Icons.Rounded.Search,
-                label = "Search",
-                selected = selected == LibrarySection.SEARCH,
-                onClick = { onSelected(LibrarySection.SEARCH) },
-            )
-            TopNavIconItem(
-                icon = Icons.Rounded.Settings,
+            TopNavItem(
                 label = "Settings",
                 selected = selected == LibrarySection.SETTINGS,
                 onClick = { onSelected(LibrarySection.SETTINGS) },
             )
-            Button(
-                onClick = onRefresh,
-                enabled = !isSyncing,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1C1C1C)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
-            ) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (isSyncing) "Syncing" else "Refresh")
-            }
+        }
+
+        Box(
+            modifier = Modifier.width(190.dp),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            Text(
+                text = "A",
+                color = NetflixRed,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
         }
     }
 
-    syncMessage?.takeIf { it.isNotBlank() }?.let {
+    syncMessage?.takeIf { isSyncing && it.isNotBlank() }?.let {
         Text(
             text = it,
-            color = if (isSyncing) NetflixRed else MutedText,
+            color = NetflixRed,
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -382,15 +398,15 @@ private fun TopNavItem(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Column(
+    Row(
         modifier = Modifier
-            .width(106.dp)
-            .height(46.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .height(34.dp)
+            .clip(RoundedCornerShape(34.dp))
+            .background(if (selected) Color(0xFF5B6070) else Color.Transparent)
             .border(
                 width = 2.dp,
-                color = if (focused) NetflixRed else Color.Transparent,
-                shape = RoundedCornerShape(8.dp),
+                color = if (focused) Color.White else Color.Transparent,
+                shape = RoundedCornerShape(34.dp),
             )
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
@@ -402,39 +418,33 @@ private fun TopNavItem(
                 }
             }
             .focusable()
-            .clickable(role = Role.Button, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            color = if (selected) Color.White else MutedText,
+            color = Color.White,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (selected) FontWeight.Black else FontWeight.Normal,
-        )
-        Spacer(Modifier.height(7.dp))
-        Box(
-            modifier = Modifier
-                .width(62.dp)
-                .height(3.dp)
-                .background(if (selected) NetflixRed else Color.Transparent),
+            fontWeight = if (selected) FontWeight.Black else FontWeight.Bold,
+            maxLines = 1,
         )
     }
 }
 
 @Composable
-private fun TopNavIconItem(
+private fun TopNavIconOnly(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Row(
+    Box(
         modifier = Modifier
-            .height(46.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(2.dp, if (focused) NetflixRed else Color.Transparent, RoundedCornerShape(8.dp))
+            .size(width = 38.dp, height = 34.dp)
+            .clip(RoundedCornerShape(34.dp))
+            .background(if (selected) Color(0xFF5B6070) else Color.Transparent)
+            .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(34.dp))
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -445,18 +455,10 @@ private fun TopNavIconItem(
                 }
             }
             .focusable()
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = if (selected) Color.White else MutedText)
-        Text(
-            label,
-            color = if (selected) Color.White else MutedText,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (selected) FontWeight.Black else FontWeight.Normal,
-        )
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -752,11 +754,32 @@ private fun HomeScreen(
     val favoriteChannels by viewModel.favoriteChannels.collectAsStateWithLifecycle(initialValue = emptyList())
     val favoriteMovies by viewModel.favoriteMovies.collectAsStateWithLifecycle(initialValue = emptyList())
     val favoriteSeries by viewModel.favoriteSeries.collectAsStateWithLifecycle(initialValue = emptyList())
+
     val continueCards = continueWatching.map {
         StripCard(
             id = it.targetId,
             title = it.title,
             subtitle = it.subtitle ?: progressLabel(it.positionMs, it.durationMs),
+            artworkUrl = it.artworkUrl,
+            targetType = TargetType.from(it.targetType),
+            categoryId = null,
+        )
+    }
+    val favoriteMovieCards = favoriteMovies.map {
+        StripCard(
+            id = it.targetId,
+            title = it.title,
+            subtitle = it.subtitle,
+            artworkUrl = it.artworkUrl,
+            targetType = TargetType.from(it.targetType),
+            categoryId = null,
+        )
+    }
+    val favoriteSeriesCards = favoriteSeries.map {
+        StripCard(
+            id = it.targetId,
+            title = it.title,
+            subtitle = it.subtitle,
             artworkUrl = it.artworkUrl,
             targetType = TargetType.from(it.targetType),
             categoryId = null,
@@ -782,108 +805,332 @@ private fun HomeScreen(
             categoryId = null,
         )
     }
-    val heroCard = continueCards.firstOrNull() ?: recentChannelCards.firstOrNull() ?: favoriteChannelCards.firstOrNull()
+    val primaryCards = remember(
+        continueCards,
+        favoriteMovieCards,
+        favoriteSeriesCards,
+        recentChannelCards,
+        favoriteChannelCards,
+    ) {
+        (continueCards + favoriteMovieCards + favoriteSeriesCards + recentChannelCards + favoriteChannelCards)
+            .distinctBy { "${it.targetType.rawValue}:${it.id}" }
+            .take(6)
+    }
+    val topPickCards = remember(primaryCards, favoriteMovieCards, favoriteSeriesCards, recentChannelCards) {
+        (favoriteMovieCards + favoriteSeriesCards + recentChannelCards + primaryCards)
+            .distinctBy { "${it.targetType.rawValue}:${it.id}" }
+            .dropWhile { primaryCards.firstOrNull()?.let { first -> first.id == it.id && first.targetType == it.targetType } == true }
+            .take(12)
+    }
+    var highlightedItem by remember { mutableStateOf<StripCard?>(null) }
+
+    LaunchedEffect(primaryCards) {
+        val current = highlightedItem
+        if (current == null || primaryCards.none { it.id == current.id && it.targetType == current.targetType }) {
+            highlightedItem = primaryCards.firstOrNull()
+        }
+    }
+
+    fun openItem(item: StripCard) {
+        when (item.targetType) {
+            TargetType.MOVIE,
+            TargetType.EPISODE,
+            TargetType.CHANNEL,
+            -> onPlay(item.targetType, item.id, item.categoryId)
+
+            TargetType.SERIES -> onOpenSeries(
+                SeriesEntity(
+                    seriesId = item.id.toLong(),
+                    categoryRemoteId = item.categoryId.orEmpty(),
+                    name = item.title,
+                    artworkUrl = item.artworkUrl,
+                    plot = null,
+                    rating = null,
+                    releaseYear = item.subtitle,
+                    isAdult = false,
+                    addedAt = null,
+                ),
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        HomeHero(
-            item = heroCard,
-            onPlay = { item -> onPlay(item.targetType, item.id, item.categoryId) },
+        Text(
+            text = "Continue Watching",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Black,
         )
 
-        HomeStrip(
-            title = "Continue Watching",
-            items = continueCards,
-            onClick = { item ->
-                when (item.targetType) {
-                    TargetType.MOVIE,
-                    TargetType.EPISODE,
-                    TargetType.CHANNEL,
-                    -> onPlay(item.targetType, item.id, item.categoryId)
-                    TargetType.SERIES -> Unit
+        if (primaryCards.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(440.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text("Your synced library will appear here", color = MutedText, style = MaterialTheme.typography.titleLarge)
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(262.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                NetflixFeatureTile(
+                    item = primaryCards.first(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    onFocused = { highlightedItem = primaryCards.first() },
+                    onClick = { openItem(primaryCards.first()) },
+                )
+                primaryCards.drop(1).take(3).forEach { item ->
+                    NetflixPosterTile(
+                        item = item,
+                        modifier = Modifier
+                            .width(178.dp)
+                            .fillMaxHeight(),
+                        onFocused = { highlightedItem = item },
+                        onClick = { openItem(item) },
+                    )
                 }
-            },
-        )
-
-        HomeStrip(
-            title = "Recent Channels",
-            items = recentChannelCards,
-            onClick = { item -> onPlay(item.targetType, item.id, item.categoryId) },
-        )
-
-        HomeStrip(
-            title = "Favorite Channels",
-            items = favoriteChannelCards,
-            onClick = { item -> onPlay(item.targetType, item.id, item.categoryId) },
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Box(modifier = Modifier.weight(1f)) {
-                HomeStrip(
-                    title = "Favorite Movies",
-                    items = favoriteMovies.map {
-                        StripCard(
-                            id = it.targetId,
-                            title = it.title,
-                            subtitle = it.subtitle,
-                            artworkUrl = it.artworkUrl,
-                            targetType = TargetType.from(it.targetType),
-                            categoryId = null,
-                        )
-                    },
-                    onClick = { item ->
-                        onOpenMovie(
-                            MovieEntity(
-                                streamId = item.id.toLong(),
-                                categoryRemoteId = item.categoryId.orEmpty(),
-                                name = item.title,
-                                artworkUrl = item.artworkUrl,
-                                plot = null,
-                                rating = null,
-                                releaseYear = item.subtitle,
-                                containerExtension = null,
-                                directSource = null,
-                                isAdult = false,
-                                addedAt = null,
-                            ),
-                        )
-                    },
-                )
             }
-            Box(modifier = Modifier.weight(1f)) {
-                HomeStrip(
-                    title = "Favorite Series",
-                    items = favoriteSeries.map {
-                        StripCard(
-                            id = it.targetId,
-                            title = it.title,
-                            subtitle = it.subtitle,
-                            artworkUrl = it.artworkUrl,
-                            targetType = TargetType.from(it.targetType),
-                            categoryId = null,
-                        )
-                    },
-                    onClick = { item ->
-                        onOpenSeries(
-                            SeriesEntity(
-                                seriesId = item.id.toLong(),
-                                categoryRemoteId = item.categoryId.orEmpty(),
-                                name = item.title,
-                                artworkUrl = item.artworkUrl,
-                                plot = null,
-                                rating = null,
-                                releaseYear = item.subtitle,
-                                isAdult = false,
-                                addedAt = null,
-                            ),
-                        )
-                    },
-                )
+
+            val detail = highlightedItem ?: primaryCards.first()
+            Text(
+                text = homeMetadata(detail),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = homeDescription(detail),
+                color = Color(0xFFE0E0E0),
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(0.62f),
+            )
+        }
+
+        NetflixSmallRail(
+            title = "Today's Top Picks for You",
+            items = if (topPickCards.isEmpty()) primaryCards.drop(1) else topPickCards,
+            onFocused = { highlightedItem = it },
+            onClick = { openItem(it) },
+        )
+    }
+}
+
+@Composable
+private fun NetflixSmallRail(
+    title: String,
+    items: List<StripCard>,
+    onFocused: (StripCard) -> Unit,
+    onClick: (StripCard) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Black,
+        )
+        if (items.isEmpty()) {
+            Spacer(Modifier.height(112.dp))
+        } else {
+            LazyRow(
+                modifier = Modifier.height(112.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(end = 32.dp),
+            ) {
+                items(items, key = { "${it.targetType.rawValue}:${it.id}" }) { item ->
+                    NetflixRailTile(
+                        item = item,
+                        modifier = Modifier
+                            .width(190.dp)
+                            .fillMaxHeight(),
+                        onFocused = { onFocused(item) },
+                        onClick = { onClick(item) },
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun NetflixRailTile(
+    item: StripCard,
+    modifier: Modifier = Modifier,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        modifier = modifier
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        tonalElevation = 0.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp)),
+        ) {
+            Artwork(
+                url = item.artworkUrl,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(8.dp),
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NetflixFeatureTile(
+    item: StripCard,
+    modifier: Modifier = Modifier,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        modifier = modifier
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        tonalElevation = 0.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp)),
+        ) {
+            Artwork(
+                url = item.artworkUrl,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(8.dp),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xAA000000)),
+                            startY = 180f,
+                        ),
+                    ),
+            )
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(shape = RoundedCornerShape(40.dp), color = Color.White) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Text("Play", color = Color.Black, fontWeight = FontWeight.Black)
+                    }
+                }
+                item.subtitle?.takeIf { it.isNotBlank() }?.let {
+                    Surface(shape = RoundedCornerShape(6.dp), color = Color(0xB0000000)) {
+                        Text(
+                            text = it,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NetflixPosterTile(
+    item: StripCard,
+    modifier: Modifier = Modifier,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        modifier = modifier
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        tonalElevation = 0.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp)),
+        ) {
+            Artwork(
+                url = item.artworkUrl,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(8.dp),
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }
@@ -3020,6 +3267,26 @@ private fun progressLabel(positionMs: Long, durationMs: Long): String {
     if (durationMs <= 0L) return "Resume"
     val percent = (positionMs.toFloat() / durationMs.toFloat() * 100f).toInt().coerceIn(0, 100)
     return "$percent% watched"
+}
+
+private fun homeMetadata(item: StripCard): String {
+    val type = when (item.targetType) {
+        TargetType.CHANNEL -> "Live TV"
+        TargetType.MOVIE -> "Movie"
+        TargetType.SERIES -> "Show"
+        TargetType.EPISODE -> "Episode"
+    }
+    return listOfNotNull(type, item.subtitle?.takeIf { it.isNotBlank() })
+        .joinToString("  •  ")
+}
+
+private fun homeDescription(item: StripCard): String {
+    return when (item.targetType) {
+        TargetType.CHANNEL -> "Jump back into ${item.title} with live playback and guide-aware channel controls."
+        TargetType.MOVIE -> "Resume ${item.title} from your synced provider library."
+        TargetType.SERIES -> "Open ${item.title} to browse seasons and episodes."
+        TargetType.EPISODE -> "Continue ${item.title} and keep moving through the series."
+    }
 }
 
 private fun launchPlayback(
