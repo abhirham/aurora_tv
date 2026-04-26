@@ -1,0 +1,47 @@
+# Gradle and Android build outputs
+.gradle/
+.kotlin/
+build/
+out/
+
+# Android Studio and IntelliJ local files
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Local machine configuration
+local.properties
+
+# Android generated artifacts
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing keys and release secrets
+*.jks
+*.keystore
+keystore.properties
+release.properties
+signing.properties
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+*.log
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
