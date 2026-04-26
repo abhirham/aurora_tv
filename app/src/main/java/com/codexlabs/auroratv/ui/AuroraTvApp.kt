@@ -151,7 +151,7 @@ fun AuroraTvApp(
                     ),
                 ),
             )
-            .padding(horizontal = 36.dp, vertical = 28.dp),
+            .padding(horizontal = 56.dp, vertical = 34.dp),
     ) {
         if (!settings.isConfigured) {
             SetupScreen(
@@ -316,7 +316,7 @@ private fun StreamingTopNav(
         Text(
             text = "Aurora TV",
             color = NetflixRed,
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Black,
         )
 
@@ -355,7 +355,7 @@ private fun StreamingTopNav(
                 enabled = !isSyncing,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1C1C1C)),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
             ) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -384,12 +384,12 @@ private fun TopNavItem(
     var focused by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
-            .width(120.dp)
-            .height(54.dp)
+            .width(106.dp)
+            .height(46.dp)
             .clip(RoundedCornerShape(8.dp))
             .border(
                 width = 2.dp,
-                color = if (focused) Color.White else Color.Transparent,
+                color = if (focused) NetflixRed else Color.Transparent,
                 shape = RoundedCornerShape(8.dp),
             )
             .onFocusChanged { focused = it.isFocused }
@@ -409,13 +409,13 @@ private fun TopNavItem(
         Text(
             text = label,
             color = if (selected) Color.White else MutedText,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = if (selected) FontWeight.Black else FontWeight.Normal,
         )
         Spacer(Modifier.height(7.dp))
         Box(
             modifier = Modifier
-                .width(78.dp)
+                .width(62.dp)
                 .height(3.dp)
                 .background(if (selected) NetflixRed else Color.Transparent),
         )
@@ -432,9 +432,9 @@ private fun TopNavIconItem(
     var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
-            .height(54.dp)
+            .height(46.dp)
             .clip(RoundedCornerShape(8.dp))
-            .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
+            .border(2.dp, if (focused) NetflixRed else Color.Transparent, RoundedCornerShape(8.dp))
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -454,7 +454,7 @@ private fun TopNavIconItem(
         Text(
             label,
             color = if (selected) Color.White else MutedText,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = if (selected) FontWeight.Black else FontWeight.Normal,
         )
     }
@@ -651,6 +651,7 @@ private fun SetupScreen(
     var baseUrl by rememberSaveable { mutableStateOf(settings.providerBaseUrl) }
     var username by rememberSaveable { mutableStateOf(settings.providerUsername) }
     var password by rememberSaveable { mutableStateOf(settings.providerPassword) }
+    val canConnect = baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -658,61 +659,81 @@ private fun SetupScreen(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.62f)
+                .fillMaxWidth(0.74f)
                 .clip(RoundedCornerShape(8.dp)),
             shape = RoundedCornerShape(8.dp),
             color = Panel.copy(alpha = 0.96f),
             tonalElevation = 0.dp,
         ) {
-            Column(
-                modifier = Modifier.padding(34.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            Row(
+                modifier = Modifier.padding(30.dp),
+                horizontalArrangement = Arrangement.spacedBy(34.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Connect Your Xtream Provider",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Aurora TV is tuned for one Xtream provider with room-friendly remote navigation, local library caching, and full live TV support.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MutedText,
-                )
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = { baseUrl = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Provider URL") },
-                    placeholder = { Text("http://provider.example.com:8080") },
-                    singleLine = true,
-                    colors = darkTextFieldColors(),
-                )
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Username") },
-                    singleLine = true,
-                    colors = darkTextFieldColors(),
-                )
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Password") },
-                    singleLine = true,
-                    colors = darkTextFieldColors(),
-                )
-                Button(
-                    onClick = { onSave(baseUrl, username, password) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                Column(
+                    modifier = Modifier.weight(0.9f),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("Save Provider And Sync")
+                    Text(
+                        text = "Connect Your Xtream Provider",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Add your provider credentials once. Aurora TV will sync live TV, movies, series, and guide data for the big screen.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MutedText,
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1.2f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    OutlinedTextField(
+                        value = baseUrl,
+                        onValueChange = { baseUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Provider URL") },
+                        placeholder = { Text("http://provider.example.com:8080") },
+                        singleLine = true,
+                        colors = darkTextFieldColors(),
+                    )
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Username") },
+                        singleLine = true,
+                        colors = darkTextFieldColors(),
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Password") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        colors = darkTextFieldColors(),
+                    )
+                    Button(
+                        onClick = { onSave(baseUrl, username, password) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        enabled = canConnect,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NetflixRed,
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF3A3A3A),
+                            disabledContentColor = MutedText,
+                        ),
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(if (canConnect) "Connect And Sync" else "Enter Details To Connect")
+                    }
                 }
             }
         }
@@ -987,42 +1008,356 @@ private fun LiveTvScreen(
     }
     val guide by guideFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
-    Column(
+    Row(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        LiveHeroPanel(
+        MockupLiveRail(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+                .width(160.dp)
+                .fillMaxHeight(),
             categories = categories,
-            channels = channels,
             selectedCategoryId = selectedCategoryId,
-            highlightedChannel = highlightedChannel,
-            guide = guide,
             onCategorySelected = { selectedCategoryId = it.remoteId },
-            onChannelFocused = { focusedChannelId = it.streamId },
-            onPlayChannel = { channel -> onPlayChannel(channel, selectedCategoryId) },
-            onToggleFavorite = {
-                highlightedChannel?.let {
-                    viewModel.toggleFavorite(
-                        targetType = TargetType.CHANNEL,
-                        targetId = it.streamId.toString(),
-                        title = it.name,
-                        subtitle = "Live TV",
-                        artworkUrl = it.logoUrl,
-                    )
-                }
-            },
         )
 
-        LiveGuideTimeline(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(210.dp),
-            channel = highlightedChannel,
-            guide = guide,
-        )
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            MockupLiveHero(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                channel = highlightedChannel,
+                guide = guide,
+                onPlay = { highlightedChannel?.let { onPlayChannel(it, selectedCategoryId) } },
+            )
+
+            MockupEpgGrid(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(370.dp),
+                channels = channels,
+                highlightedChannel = highlightedChannel,
+                guide = guide,
+                onChannelFocused = { focusedChannelId = it.streamId },
+                onPlayChannel = { onPlayChannel(it, selectedCategoryId) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun MockupLiveRail(
+    modifier: Modifier,
+    categories: List<CategoryEntity>,
+    selectedCategoryId: String?,
+    onCategorySelected: (CategoryEntity) -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF0D0D0D),
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val selectedCategory = categories.firstOrNull { it.remoteId == selectedCategoryId }
+            MockupRailItem(
+                label = "Live",
+                selected = true,
+                icon = Icons.Rounded.LiveTv,
+                onClick = { selectedCategory?.let(onCategorySelected) },
+            )
+            categories.take(8).forEach { category ->
+                MockupRailItem(
+                    label = category.name,
+                    selected = selectedCategoryId == category.remoteId,
+                    icon = Icons.Rounded.Tv,
+                    onClick = { onCategorySelected(category) },
+                )
+            }
+            MockupRailItem(
+                label = "Favorites",
+                selected = false,
+                icon = Icons.Rounded.Favorite,
+                onClick = {},
+            )
+        }
+    }
+}
+
+@Composable
+private fun MockupRailItem(
+    label: String,
+    selected: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    FocusCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp),
+        selected = selected,
+        onClick = onClick,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = if (selected) Color.White else MutedText)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                label,
+                color = if (selected) Color.White else MutedText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.Black else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MockupLiveHero(
+    modifier: Modifier,
+    channel: ChannelEntity?,
+    guide: List<EpgEventEntity>,
+    onPlay: () -> Unit,
+) {
+    val now = System.currentTimeMillis()
+    val current = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
+    val next = guide.firstOrNull { it.startEpochMillis > (current?.startEpochMillis ?: 0L) }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF050505),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Artwork(
+                url = channel?.logoUrl,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.58f)
+                    .align(Alignment.CenterEnd),
+                shape = RoundedCornerShape(8.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF050505),
+                                Color(0xF2050505),
+                                Color(0x80050505),
+                                Color(0x26050505),
+                            ),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 48.dp, top = 26.dp, end = 28.dp, bottom = 34.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("LIVE TV", color = NetflixRed, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Text(
+                        "CH ${channel?.channelNumber ?: "--"}",
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF063F18))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(8.dp).clip(RoundedCornerShape(8.dp)).background(GuideGreen))
+                            Text("LIVE", color = GuideGreen, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+                Text(
+                    channel?.name ?: "Select a channel",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                Spacer(Modifier.height(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(34.dp), verticalAlignment = Alignment.Top) {
+                    Column {
+                        Text("Now Playing", color = NetflixRed, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            current?.title ?: "Guide loading",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        current?.let {
+                            Text(formatEpgClockRange(it), color = MutedText, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                    Box(Modifier.width(1.dp).height(82.dp).background(SoftLine))
+                    Column {
+                        Text("Next", color = MutedText, style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            next?.title ?: "Upcoming",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        next?.let {
+                            Text(formatEpgClockRange(it), color = MutedText, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(26.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Button(
+                        onClick = onPlay,
+                        enabled = channel != null,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                        contentPadding = PaddingValues(horizontal = 34.dp, vertical = 16.dp),
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(34.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Play Live", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = {},
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC202020)),
+                        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
+                    ) {
+                        Icon(Icons.Rounded.GridView, contentDescription = null, modifier = Modifier.size(30.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Program Guide", style = MaterialTheme.typography.headlineSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MockupEpgGrid(
+    modifier: Modifier,
+    channels: List<ChannelEntity>,
+    highlightedChannel: ChannelEntity?,
+    guide: List<EpgEventEntity>,
+    onChannelFocused: (ChannelEntity) -> Unit,
+    onPlayChannel: (ChannelEntity) -> Unit,
+) {
+    val now = System.currentTimeMillis()
+    val rows = remember(channels, highlightedChannel) {
+        val selected = highlightedChannel
+        buildList {
+            if (selected != null) add(selected)
+            channels.filterNot { it.streamId == selected?.streamId }.take(4).forEach(::add)
+        }
+    }
+
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.height(30.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("ON NOW", modifier = Modifier.width(230.dp), color = Color.White, fontWeight = FontWeight.Black)
+            listOf("10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM").forEach { time ->
+                Text(time, modifier = Modifier.weight(1f), color = MutedText, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+
+        if (rows.isEmpty()) {
+            EmptyState("No channels in this group")
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(rows, key = { it.streamId }) { channel ->
+                    val selected = channel.streamId == highlightedChannel?.streamId
+                    Row(
+                        modifier = Modifier.height(62.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FocusCard(
+                            modifier = Modifier.width(230.dp).fillMaxHeight(),
+                            selected = selected,
+                            onClick = { onPlayChannel(channel) },
+                            onFocused = { onChannelFocused(channel) },
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    channel.channelNumber?.toString() ?: "--",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Artwork(
+                                    url = channel.logoUrl,
+                                    modifier = Modifier.size(48.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentScale = ContentScale.Fit,
+                                )
+                                Text(channel.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        val events = if (selected) guide.take(4) else emptyList()
+                        repeat(4) { index ->
+                            val event = events.getOrNull(index)
+                            val current = event != null && now in event.startEpochMillis until event.endEpochMillis
+                            Surface(
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (current) NetflixRed.copy(alpha = 0.24f) else Color(0xFF191919),
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Text(
+                                        event?.title ?: if (index == 0) "Live Program" else "Upcoming",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        event?.let(::formatEpgClockRange) ?: "",
+                                        color = if (current) GuideGreen else MutedText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1056,84 +1391,83 @@ private fun MovieScreen(
     }
     val highlightedMovie = focusedMovieId?.let(movieById::get) ?: movies.firstOrNull()
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        CategoryRail(
-            modifier = Modifier.width(240.dp),
-            title = "Groups",
-            categories = categories,
-            selectedCategoryId = selectedCategoryId,
-            onCategoryFocused = {},
-            onCategoryClicked = { selectedCategoryId = it.remoteId },
-            onHideCategory = { viewModel.setCategoryHidden(LibrarySection.MOVIES, it.remoteId, true) },
-        )
-
-        Surface(
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-            shape = RoundedCornerShape(8.dp),
-            color = Panel.copy(alpha = 0.92f),
-        ) {
-            if (movies.isEmpty()) {
-                EmptyState("No movies available in this group")
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(170.dp),
-                    contentPadding = PaddingValues(18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
+                FocusCard(
+                    modifier = Modifier.height(48.dp),
+                    selected = selectedCategoryId == category.remoteId,
+                    onClick = { selectedCategoryId = category.remoteId },
                 ) {
-                    items(movies, key = { it.streamId }) { movie ->
-                        FocusCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            selected = movie.streamId == focusedMovieId,
-                            onClick = { onOpenMovie(movie) },
-                            onFocused = { focusedMovieId = movie.streamId },
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Artwork(
-                                    url = movie.artworkUrl,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(0.72f),
-                                    shape = RoundedCornerShape(8.dp),
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = movie.name,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = category.name,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
 
-        DetailPanel(
-            modifier = Modifier.width(400.dp).fillMaxHeight(),
-            artworkUrl = highlightedMovie?.artworkUrl,
-            title = highlightedMovie?.name ?: "Select a movie",
-            subtitle = highlightedMovie?.releaseYear ?: highlightedMovie?.rating,
-            body = highlightedMovie?.plot ?: "Choose a title to inspect its details and play it.",
-            primaryLabel = "Open Details",
-            onPrimary = { highlightedMovie?.let(onOpenMovie) },
-            secondaryLabel = "Favorite",
-            onSecondary = {
-                highlightedMovie?.let { movie ->
-                    viewModel.toggleFavorite(
-                        targetType = TargetType.MOVIE,
-                        targetId = movie.streamId.toString(),
-                        title = movie.name,
-                        subtitle = movie.releaseYear ?: movie.rating,
-                        artworkUrl = movie.artworkUrl,
-                    )
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            Surface(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                shape = RoundedCornerShape(8.dp),
+                color = Color.Transparent,
+            ) {
+                if (movies.isEmpty()) {
+                    EmptyState("No movies available in this group")
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(150.dp),
+                        contentPadding = PaddingValues(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        items(movies, key = { it.streamId }) { movie ->
+                            PosterTile(
+                                title = movie.name,
+                                subtitle = movie.releaseYear ?: movie.rating,
+                                artworkUrl = movie.artworkUrl,
+                                selected = movie.streamId == focusedMovieId,
+                                onClick = { onOpenMovie(movie) },
+                                onFocused = { focusedMovieId = movie.streamId },
+                            )
+                        }
+                    }
                 }
-            },
-        )
+            }
+
+            CompactMediaDetailPanel(
+                modifier = Modifier.width(430.dp).fillMaxHeight(),
+                artworkUrl = highlightedMovie?.artworkUrl,
+                title = highlightedMovie?.name ?: "Select a movie",
+                subtitle = highlightedMovie?.releaseYear ?: highlightedMovie?.rating ?: "Movie",
+                body = highlightedMovie?.plot ?: "Choose a title to inspect details.",
+                primaryLabel = "Play",
+                onPrimary = { highlightedMovie?.let(onOpenMovie) },
+                secondaryLabel = "Favorite",
+                onSecondary = {
+                    highlightedMovie?.let { movie ->
+                        viewModel.toggleFavorite(
+                            targetType = TargetType.MOVIE,
+                            targetId = movie.streamId.toString(),
+                            title = movie.name,
+                            subtitle = movie.releaseYear ?: movie.rating,
+                            artworkUrl = movie.artworkUrl,
+                        )
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -1249,6 +1583,100 @@ private fun SeriesScreen(
 }
 
 @Composable
+private fun PosterTile(
+    title: String,
+    subtitle: String?,
+    artworkUrl: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onFocused: () -> Unit,
+) {
+    FocusCard(
+        selected = selected,
+        onClick = onClick,
+        onFocused = onFocused,
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Artwork(
+                url = artworkUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.68f),
+                shape = RoundedCornerShape(6.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(it, color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactMediaDetailPanel(
+    modifier: Modifier,
+    artworkUrl: String?,
+    title: String,
+    subtitle: String?,
+    body: String,
+    primaryLabel: String,
+    onPrimary: () -> Unit,
+    secondaryLabel: String,
+    onSecondary: () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = Panel.copy(alpha = 0.72f),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Artwork(
+                url = artworkUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.75f),
+                shape = RoundedCornerShape(6.dp),
+                contentScale = ContentScale.Crop,
+            )
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(it, color = MutedText, style = MaterialTheme.typography.titleMedium)
+            }
+            Text(body, color = MutedText, maxLines = 5, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onPrimary,
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
+                ) {
+                    Text(primaryLabel, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onSecondary,
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                ) {
+                    Text(secondaryLabel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SearchScreen(
     settings: AppSettings,
     viewModel: MainViewModel,
@@ -1332,20 +1760,20 @@ private fun SearchResultSection(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(modifier = Modifier.height(14.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(items, key = { "${it.targetType.rawValue}:${it.targetId}" }) { item ->
-                    FocusCard(
-                        modifier = Modifier.width(230.dp),
-                        onClick = { onClick(item) },
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Artwork(
-                                url = item.artworkUrl,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(0.9f),
-                                shape = RoundedCornerShape(8.dp),
-                            )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(items, key = { "${it.targetType.rawValue}:${it.targetId}" }) { item ->
+                        FocusCard(
+                            modifier = Modifier.width(172.dp),
+                            onClick = { onClick(item) },
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                Artwork(
+                                    url = item.artworkUrl,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(0.72f),
+                                    shape = RoundedCornerShape(8.dp),
+                                )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             item.subtitle?.let {
@@ -1428,11 +1856,14 @@ private fun SettingsScreen(
 
             Button(
                 onClick = { onSaveProvider(baseUrl, username, password) },
+                modifier = Modifier.fillMaxWidth(),
                 enabled = !isSyncing && baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
             ) {
-                Text("Save Provider")
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(if (isSyncing) "Syncing" else "Connect And Sync")
             }
 
             SettingToggleRow(
@@ -2198,45 +2629,56 @@ private fun MovieDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.84f)
-                .fillMaxHeight(0.84f),
+                .fillMaxWidth(0.74f)
+                .fillMaxHeight(0.72f),
             shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = Color(0xF2111111),
         ) {
-            Row(modifier = Modifier.fillMaxSize().padding(26.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(modifier = Modifier.fillMaxSize().padding(22.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Artwork(
                     url = movie.artworkUrl,
                     modifier = Modifier
-                        .width(320.dp)
+                        .width(250.dp)
                         .fillMaxHeight(),
                     shape = RoundedCornerShape(8.dp),
                     contentScale = ContentScale.Crop,
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(movie.name, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                    Text(movie.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(
                         movie.releaseYear ?: movie.rating ?: "Movie",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MutedText,
                     )
-                    Text(movie.plot ?: "No plot available.", style = MaterialTheme.typography.bodyLarge)
+                    Text(movie.plot ?: "No plot available.", style = MaterialTheme.typography.bodyLarge, color = MutedText, maxLines = 7, overflow = TextOverflow.Ellipsis)
                     Spacer(modifier = Modifier.weight(1f))
-                    Button(onClick = onPlay, modifier = Modifier.fillMaxWidth()) {
-                        Text("Play Movie")
-                    }
-                    Button(
-                        onClick = {
-                            viewModel.toggleFavorite(
-                                targetType = TargetType.MOVIE,
-                                targetId = movie.streamId.toString(),
-                                title = movie.name,
-                                subtitle = movie.releaseYear ?: movie.rating,
-                                artworkUrl = movie.artworkUrl,
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Favorite")
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = onPlay,
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
+                            contentPadding = PaddingValues(horizontal = 30.dp, vertical = 12.dp),
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Play")
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.toggleFavorite(
+                                    targetType = TargetType.MOVIE,
+                                    targetId = movie.streamId.toString(),
+                                    title = movie.name,
+                                    subtitle = movie.releaseYear ?: movie.rating,
+                                    artworkUrl = movie.artworkUrl,
+                                )
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                        ) {
+                            Text("Favorite")
+                        }
                     }
                 }
             }
@@ -2410,15 +2852,15 @@ private fun HomeStrip(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     items(items, key = { "${it.targetType.rawValue}:${it.id}" }) { item ->
                         FocusCard(
-                            modifier = Modifier.width(220.dp),
+                            modifier = Modifier.width(176.dp),
                             onClick = { onClick(item) },
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(8.dp)) {
                                 Artwork(
                                     url = item.artworkUrl,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1f),
+                                        .aspectRatio(0.72f),
                                     shape = RoundedCornerShape(8.dp),
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -2449,10 +2891,9 @@ private fun FocusCard(
     content: @Composable () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val active = focused || selected
     val borderColor = when {
-        focused -> Color.White
-        selected -> MaterialTheme.colorScheme.secondary
+        focused -> NetflixRed
+        selected -> NetflixRed.copy(alpha = 0.85f)
         else -> Color.Transparent
     }
 
@@ -2473,7 +2914,11 @@ private fun FocusCard(
             .focusable()
             .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(8.dp),
-        color = if (active) Color(0xFF2D2D2D) else PanelRaised.copy(alpha = 0.76f),
+        color = when {
+            selected -> Color(0xFF242424)
+            focused -> Color(0xFF292929)
+            else -> PanelRaised.copy(alpha = 0.62f)
+        },
         tonalElevation = 0.dp,
     ) {
         Box(
@@ -2564,6 +3009,11 @@ private fun formatEpgTime(event: EpgEventEntity): String {
 private fun formatEpgShortTime(event: EpgEventEntity): String {
     val formatter = SimpleDateFormat("h:mm a", Locale.getDefault())
     return formatter.format(Date(event.startEpochMillis))
+}
+
+private fun formatEpgClockRange(event: EpgEventEntity): String {
+    val formatter = SimpleDateFormat("h:mm a", Locale.getDefault())
+    return "${formatter.format(Date(event.startEpochMillis))} - ${formatter.format(Date(event.endEpochMillis))}"
 }
 
 private fun progressLabel(positionMs: Long, durationMs: Long): String {

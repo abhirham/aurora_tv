@@ -1,0 +1,286 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.codexlabs.auroratv"
+4    android:versionCode="1"
+5    android:versionName="0.1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="36" />
+10
+11    <uses-feature
+11-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:4:5-6:35
+12        android:name="android.software.leanback"
+12-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:5:9-49
+13        android:required="true" />
+13-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:6:9-32
+14    <uses-feature
+14-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:7:5-9:36
+15        android:name="android.hardware.touchscreen"
+15-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:8:9-52
+16        android:required="false" />
+16-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:9:9-33
+17
+18    <uses-permission android:name="android.permission.INTERNET" />
+18-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:11:5-67
+18-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:11:22-64
+19    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+19-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:12:5-79
+19-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:12:22-76
+20    <uses-permission android:name="android.permission.WAKE_LOCK" />
+20-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:13:5-68
+20-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:13:22-65
+21    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+21-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:14:5-92
+21-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:14:22-89
+22    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+22-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:25:5-81
+22-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:25:22-78
+23    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+23-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:26:5-77
+23-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:26:22-74
+24
+25    <permission
+25-->[androidx.core:core:1.18.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/3b9f12763443426df4d1dc7d8511c290/transformed/core-1.18.0/AndroidManifest.xml:22:5-24:47
+26        android:name="com.codexlabs.auroratv.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+26-->[androidx.core:core:1.18.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/3b9f12763443426df4d1dc7d8511c290/transformed/core-1.18.0/AndroidManifest.xml:23:9-81
+27        android:protectionLevel="signature" />
+27-->[androidx.core:core:1.18.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/3b9f12763443426df4d1dc7d8511c290/transformed/core-1.18.0/AndroidManifest.xml:24:9-44
+28
+29    <uses-permission android:name="com.codexlabs.auroratv.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+29-->[androidx.core:core:1.18.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/3b9f12763443426df4d1dc7d8511c290/transformed/core-1.18.0/AndroidManifest.xml:26:5-97
+29-->[androidx.core:core:1.18.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/3b9f12763443426df4d1dc7d8511c290/transformed/core-1.18.0/AndroidManifest.xml:26:22-94
+30
+31    <application
+31-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:16:5-46:19
+32        android:name="com.codexlabs.auroratv.app.AuroraTvApplication"
+32-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:17:9-48
+33        android:allowBackup="true"
+33-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:18:9-35
+34        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+34-->[androidx.core:core:1.18.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/3b9f12763443426df4d1dc7d8511c290/transformed/core-1.18.0/AndroidManifest.xml:28:18-86
+35        android:banner="@drawable/tv_banner"
+35-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:19:9-45
+36        android:extractNativeLibs="false"
+37        android:icon="@mipmap/ic_launcher"
+37-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:20:9-43
+38        android:label="@string/app_name"
+38-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:21:9-41
+39        android:supportsRtl="true"
+39-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:22:9-35
+40        android:theme="@style/Theme.AuroraTV"
+40-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:23:9-46
+41        android:usesCleartextTraffic="true" >
+41-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:24:9-44
+42        <activity
+42-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:26:9-33:53
+43            android:name="com.codexlabs.auroratv.player.PlayerActivity"
+43-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:27:13-50
+44            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize"
+44-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:28:13-115
+45            android:exported="false"
+45-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:29:13-37
+46            android:launchMode="singleTask"
+46-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:30:13-44
+47            android:resizeableActivity="true"
+47-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:31:13-46
+48            android:supportsPictureInPicture="true"
+48-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:32:13-52
+49            android:theme="@style/Theme.AuroraTV" />
+49-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:33:13-50
+50        <activity
+50-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:35:9-45:20
+51            android:name="com.codexlabs.auroratv.ui.MainActivity"
+51-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:36:13-44
+52            android:banner="@drawable/tv_banner"
+52-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:37:13-49
+53            android:exported="true"
+53-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:38:13-36
+54            android:screenOrientation="landscape"
+54-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:39:13-50
+55            android:theme="@style/Theme.AuroraTV" >
+55-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:40:13-50
+56            <intent-filter>
+56-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:41:13-44:29
+57                <action android:name="android.intent.action.MAIN" />
+57-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:42:17-69
+57-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:42:25-66
+58
+59                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+59-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:43:17-86
+59-->/Users/abhirhamsavarap/Projects/iptv codex/app/src/main/AndroidManifest.xml:43:27-83
+60            </intent-filter>
+61        </activity>
+62
+63        <provider
+63-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:29:9-37:20
+64            android:name="androidx.startup.InitializationProvider"
+64-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:30:13-67
+65            android:authorities="com.codexlabs.auroratv.androidx-startup"
+65-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:31:13-68
+66            android:exported="false" >
+66-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:32:13-37
+67            <meta-data
+67-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:34:13-36:52
+68                android:name="androidx.work.WorkManagerInitializer"
+68-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:35:17-68
+69                android:value="androidx.startup" />
+69-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:36:17-49
+70            <meta-data
+70-->[androidx.emoji2:emoji2:1.4.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/d1d25a512174bcb622baeae3902cf5b6/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+71                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+71-->[androidx.emoji2:emoji2:1.4.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/d1d25a512174bcb622baeae3902cf5b6/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+72                android:value="androidx.startup" />
+72-->[androidx.emoji2:emoji2:1.4.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/d1d25a512174bcb622baeae3902cf5b6/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+73            <meta-data
+73-->[androidx.lifecycle:lifecycle-process:2.9.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/05a5f6a7a96769e2be9c1d1f185bffb1/transformed/lifecycle-process-2.9.4/AndroidManifest.xml:29:13-31:52
+74                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+74-->[androidx.lifecycle:lifecycle-process:2.9.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/05a5f6a7a96769e2be9c1d1f185bffb1/transformed/lifecycle-process-2.9.4/AndroidManifest.xml:30:17-78
+75                android:value="androidx.startup" />
+75-->[androidx.lifecycle:lifecycle-process:2.9.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/05a5f6a7a96769e2be9c1d1f185bffb1/transformed/lifecycle-process-2.9.4/AndroidManifest.xml:31:17-49
+76            <meta-data
+76-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:29:13-31:52
+77                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+77-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:30:17-85
+78                android:value="androidx.startup" />
+78-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:31:17-49
+79            <meta-data
+79-->[com.squareup.okhttp3:okhttp-android:5.3.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/4ccf167663161f9b90c6854ec7dedf09/transformed/okhttp-release/AndroidManifest.xml:16:13-18:52
+80                android:name="okhttp3.internal.platform.PlatformInitializer"
+80-->[com.squareup.okhttp3:okhttp-android:5.3.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/4ccf167663161f9b90c6854ec7dedf09/transformed/okhttp-release/AndroidManifest.xml:17:17-77
+81                android:value="androidx.startup" />
+81-->[com.squareup.okhttp3:okhttp-android:5.3.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/4ccf167663161f9b90c6854ec7dedf09/transformed/okhttp-release/AndroidManifest.xml:18:17-49
+82        </provider>
+83
+84        <service
+84-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:39:9-45:35
+85            android:name="androidx.work.impl.background.systemjob.SystemJobService"
+85-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:40:13-84
+86            android:directBootAware="false"
+86-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:41:13-44
+87            android:enabled="@bool/enable_system_job_service_default"
+87-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:42:13-70
+88            android:exported="true"
+88-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:43:13-36
+89            android:permission="android.permission.BIND_JOB_SERVICE" />
+89-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:44:13-69
+90        <service
+90-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:46:9-52:35
+91            android:name="androidx.work.impl.foreground.SystemForegroundService"
+91-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:47:13-81
+92            android:directBootAware="false"
+92-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:48:13-44
+93            android:enabled="@bool/enable_system_foreground_service_default"
+93-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:49:13-77
+94            android:exported="false" />
+94-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:50:13-37
+95
+96        <receiver
+96-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:54:9-59:35
+97            android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
+97-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:55:13-88
+98            android:directBootAware="false"
+98-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:56:13-44
+99            android:enabled="true"
+99-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:57:13-35
+100            android:exported="false" />
+100-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:58:13-37
+101        <receiver
+101-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:60:9-69:20
+102            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+102-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:61:13-88
+103            android:directBootAware="false"
+103-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:62:13-44
+104            android:enabled="false"
+104-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:63:13-36
+105            android:exported="false" >
+105-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:64:13-37
+106            <intent-filter>
+106-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:66:13-68:29
+107                <action android:name="android.intent.action.BOOT_COMPLETED" />
+107-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:67:17-79
+107-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:67:25-76
+108            </intent-filter>
+109        </receiver>
+110        <receiver
+110-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:70:9-80:20
+111            android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
+111-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:71:13-78
+112            android:directBootAware="false"
+112-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:72:13-44
+113            android:enabled="true"
+113-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:73:13-35
+114            android:exported="true"
+114-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:74:13-36
+115            android:permission="android.permission.DUMP" >
+115-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:75:13-57
+116            <intent-filter>
+116-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:77:13-79:29
+117                <action android:name="androidx.work.diagnostics.REQUEST_DIAGNOSTICS" />
+117-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:78:17-88
+117-->[androidx.work:work-runtime:2.11.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/c471187c42b5e2946d5d028191543d6f/transformed/work-runtime-2.11.1/AndroidManifest.xml:78:25-85
+118            </intent-filter>
+119        </receiver>
+120
+121        <uses-library
+121-->[androidx.window:window:1.5.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f21e79cea6f3fa4fa5d48c0cd91d0453/transformed/window-1.5.0/AndroidManifest.xml:23:9-25:40
+122            android:name="androidx.window.extensions"
+122-->[androidx.window:window:1.5.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f21e79cea6f3fa4fa5d48c0cd91d0453/transformed/window-1.5.0/AndroidManifest.xml:24:13-54
+123            android:required="false" />
+123-->[androidx.window:window:1.5.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f21e79cea6f3fa4fa5d48c0cd91d0453/transformed/window-1.5.0/AndroidManifest.xml:25:13-37
+124        <uses-library
+124-->[androidx.window:window:1.5.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f21e79cea6f3fa4fa5d48c0cd91d0453/transformed/window-1.5.0/AndroidManifest.xml:26:9-28:40
+125            android:name="androidx.window.sidecar"
+125-->[androidx.window:window:1.5.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f21e79cea6f3fa4fa5d48c0cd91d0453/transformed/window-1.5.0/AndroidManifest.xml:27:13-51
+126            android:required="false" />
+126-->[androidx.window:window:1.5.0] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/f21e79cea6f3fa4fa5d48c0cd91d0453/transformed/window-1.5.0/AndroidManifest.xml:28:13-37
+127
+128        <service
+128-->[androidx.room:room-runtime-android:2.8.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/bf814900f88d996a0771677437488069/transformed/room-runtime/AndroidManifest.xml:24:9-28:63
+129            android:name="androidx.room.MultiInstanceInvalidationService"
+129-->[androidx.room:room-runtime-android:2.8.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/bf814900f88d996a0771677437488069/transformed/room-runtime/AndroidManifest.xml:25:13-74
+130            android:directBootAware="true"
+130-->[androidx.room:room-runtime-android:2.8.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/bf814900f88d996a0771677437488069/transformed/room-runtime/AndroidManifest.xml:26:13-43
+131            android:exported="false" />
+131-->[androidx.room:room-runtime-android:2.8.4] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/bf814900f88d996a0771677437488069/transformed/room-runtime/AndroidManifest.xml:27:13-37
+132
+133        <receiver
+133-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:34:9-52:20
+134            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+134-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:35:13-76
+135            android:directBootAware="false"
+135-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:36:13-44
+136            android:enabled="true"
+136-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:37:13-35
+137            android:exported="true"
+137-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:38:13-36
+138            android:permission="android.permission.DUMP" >
+138-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:39:13-57
+139            <intent-filter>
+139-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:40:13-42:29
+140                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+140-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:41:17-91
+140-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:41:25-88
+141            </intent-filter>
+142            <intent-filter>
+142-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:43:13-45:29
+143                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+143-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:44:17-85
+143-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:44:25-82
+144            </intent-filter>
+145            <intent-filter>
+145-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:46:13-48:29
+146                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+146-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:47:17-88
+146-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:47:25-85
+147            </intent-filter>
+148            <intent-filter>
+148-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:49:13-51:29
+149                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+149-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:50:17-95
+149-->[androidx.profileinstaller:profileinstaller:1.4.1] /Users/abhirhamsavarap/.gradle/caches/8.13/transforms/48e1c4b0abad86266c26423354aaa1d5/transformed/profileinstaller-1.4.1/AndroidManifest.xml:50:25-92
+150            </intent-filter>
+151        </receiver>
+152    </application>
+153
+154</manifest>

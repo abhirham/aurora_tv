@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <color name="aurora_copper">#FF8A3D</color>
+    <color name="aurora_ink">#07111E</color>
+    <color name="aurora_red">#FF6471</color>
+    <color name="aurora_sand">#F4E5CF</color>
+    <color name="aurora_surface">#101C2B</color>
+    <color name="aurora_surface_alt">#16273B</color>
+    <color name="aurora_teal">#4BE1C3</color>
+    <string name="app_name">Aurora TV</string>
+    <string name="auto_sync">Auto Sync Library</string>
+    <string name="buffer_profile">Buffer Profile</string>
+    <string name="continue_watching">Continue Watching</string>
+    <string name="enter_pip">Picture in Picture</string>
+    <string name="epg_window">EPG Window Hours</string>
+    <string name="external_player">External Player</string>
+    <string name="favorites">Favorites</string>
+    <string name="home">Home</string>
+    <string name="internal_player">Internal Player</string>
+    <string name="last_sync">Last Sync</string>
+    <string name="live_tv">Live TV</string>
+    <string name="movies">Movies</string>
+    <string name="open_details">Open Details</string>
+    <string name="parental_pin">Parental PIN</string>
+    <string name="play_now">Play Now</string>
+    <string name="player">Player</string>
+    <string name="preferred_player">Preferred Player</string>
+    <string name="provider_password_hint">Password</string>
+    <string name="provider_url_hint">http://provider.example.com:8080</string>
+    <string name="provider_username_hint">Username</string>
+    <string name="recent_channels">Recent Channels</string>
+    <string name="refresh_library">Refresh Library</string>
+    <string name="save_provider">Save Provider</string>
+    <string name="search">Search</string>
+    <string name="series">Series</string>
+    <string name="settings">Settings</string>
+    <string name="setup_subtitle">Aurora TV is tuned for one Xtream provider with large libraries, Google TV remote navigation, and local caching for live TV, movies, and series.</string>
+    <string name="setup_title">Connect Your Xtream Provider</string>
+    <string name="show_adult_content">Show Adult Content</string>
+    <style name="Theme.AuroraTV" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/aurora_teal</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowBackground">@color/aurora_ink</item>
+        <item name="android:windowAllowEnterTransitionOverlap">true</item>
+        <item name="android:windowAllowReturnTransitionOverlap">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" ns1:targetApi="28">shortEdges</item>
+    </style>
+</resources>

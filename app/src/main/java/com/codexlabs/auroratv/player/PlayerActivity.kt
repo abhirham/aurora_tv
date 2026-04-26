@@ -11,6 +11,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +22,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,14 +41,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,13 +78,21 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+
+private val TvSelectKeys = setOf(
+    Key.DirectionCenter,
+    Key.Enter,
+    Key.NumPadEnter,
+)
 
 class PlayerActivity : ComponentActivity() {
     companion object {
@@ -238,6 +268,7 @@ class PlayerActivity : ComponentActivity() {
         player.setMediaItem(mediaItem)
         player.prepare()
         player.playWhenReady = true
+        player.play()
 
         if (descriptor.isLive) {
             viewModel.registerRecentChannel(
@@ -319,6 +350,7 @@ private fun PlayerScreen(
     onClose: () -> Unit,
 ) {
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var audioProfileCount by remember { mutableIntStateOf(countAudioProfiles(player.currentTracks)) }
 
     val guideFlow: Flow<List<EpgEventEntity>> = remember(descriptor?.targetId, descriptor?.isLive) {
         if (descriptor?.isLive == true) {
@@ -340,6 +372,10 @@ private fun PlayerScreen(
         if (descriptor?.isLive == true) {
             viewModel.ensureGuide(descriptor.targetId.toLong())
         }
+        if (descriptor != null) {
+            player.playWhenReady = true
+            player.play()
+        }
     }
 
     LaunchedEffect(overlayVisible, descriptor?.targetId) {
@@ -358,8 +394,13 @@ private fun PlayerScreen(
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 isPlaying = false
             }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                audioProfileCount = countAudioProfiles(tracks)
+            }
         }
         player.addListener(listener)
+        audioProfileCount = countAudioProfiles(player.currentTracks)
         onDispose {
             player.removeListener(listener)
         }
@@ -398,6 +439,7 @@ private fun PlayerScreen(
                 onNextChannel = onNextChannel,
                 onEnterPip = onEnterPip,
                 onClose = onClose,
+                showAudioOptions = audioProfileCount > 1,
             )
         }
 
@@ -433,10 +475,12 @@ private fun PlayerOverlay(
     onNextChannel: () -> Unit,
     onEnterPip: () -> Unit,
     onClose: () -> Unit,
+    showAudioOptions: Boolean,
 ) {
     val now = System.currentTimeMillis()
     val currentShow = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
     val nextShow = guide.firstOrNull { it.startEpochMillis > (currentShow?.startEpochMillis ?: now) }
+    val isLive = descriptor?.isLive == true
 
     Box(
         modifier = Modifier
@@ -444,80 +488,329 @@ private fun PlayerOverlay(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xB3050C18),
-                        Color.Transparent,
-                        Color(0x99050C18),
+                        Color(0xE6000000),
+                        Color(0x33000000),
+                        Color(0xF2000000),
                     ),
                 ),
             ),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(horizontal = 28.dp, vertical = 22.dp),
+                .padding(start = 64.dp, top = 56.dp),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            MinimalPlayerIcon(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                onClick = onClose,
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MinimalPlayerIcon(
+                        icon = Icons.Rounded.SkipPrevious,
+                        onClick = if (isLive) onPrevChannel else onTogglePlayPause,
+                    )
+                    MinimalPlayerIcon(
+                        icon = Icons.Rounded.SkipNext,
+                        onClick = if (isLive) onNextChannel else onTogglePlayPause,
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "OPTIONS",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 54.dp, end = 62.dp),
+            horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Dolby Vision", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
             Text(
-                text = descriptor?.title ?: "Loading stream",
-                style = MaterialTheme.typography.displaySmall,
+                descriptor?.title ?: "Loading stream",
                 color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
             )
             descriptor?.subtitle?.let {
-                Text(it, color = Color(0xFFE0E6EC), style = MaterialTheme.typography.titleLarge)
+                Text(it, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            currentShow?.let {
-                Text(
-                    text = "Now: ${formatGuideTime(it)}  ${it.title}",
-                    color = Color(0xFF8FF3DE),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+            if (isLive) {
+                currentShow?.let {
+                    Text("Now  ${it.title}", color = Color(0xFFE0E0E0), style = MaterialTheme.typography.bodyLarge)
+                }
+                nextShow?.let {
+                    Text("Next  ${it.title}", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodyMedium)
+                }
             }
-            nextShow?.let {
-                Text(
-                    text = "Next: ${formatGuideTime(it)}  ${it.title}",
-                    color = Color(0xFFF0CFAE),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
+        }
+
+        if (!isPlaying) {
+            Text(
+                "A",
+                modifier = Modifier.align(Alignment.Center),
+                color = Color(0xFFE50914),
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Black,
+            )
         }
 
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(28.dp),
+                .padding(start = 64.dp, end = 64.dp, bottom = 54.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            if (descriptor?.isLive == false) {
-                Text(
-                    text = "${formatProgressTime(positionMs)} / ${formatProgressTime(durationMs)}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LargeRoundPlayButton(
+                    isPlaying = isPlaying,
+                    onClick = onTogglePlayPause,
+                    onSeekBack = onSeekBack,
+                    onSeekForward = onSeekForward,
+                    seekEnabled = !isLive,
                 )
-            } else {
                 Text(
-                    text = "Tip: hide controls, then use up/down to change channels",
-                    color = Color(0xFFE0E6EC),
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = if (isLive) "LIVE" else formatProgressTime(positionMs),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                PlaybackProgressBar(
+                    modifier = Modifier.weight(1f),
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    isLive = isLive,
+                )
+                Text(
+                    text = if (isLive) "LIVE" else formatProgressTime(durationMs),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onTogglePlayPause) {
-                    Text(if (isPlaying) "Pause" else "Play")
+            if (showAudioOptions) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PlayerPill("English [Original]")
+                    Spacer(Modifier.width(12.dp))
+                    PlayerPill("English [Original] with Subtitles", checked = true)
+                    Spacer(Modifier.width(12.dp))
+                    PlayerPill("Other...")
+                    Spacer(Modifier.width(12.dp))
+                    SmallCircleControl(icon = Icons.Rounded.Settings, onClick = onEnterPip)
                 }
-                if (descriptor?.isLive == true) {
-                    Button(onClick = onPrevChannel) { Text("Previous") }
-                    Button(onClick = onNextChannel) { Text("Next") }
-                } else {
-                    Button(onClick = onSeekBack) { Text("-10s") }
-                    Button(onClick = onSeekForward) { Text("+10s") }
-                }
-                Button(onClick = onEnterPip) { Text("PiP") }
-                Button(onClick = onClose) { Text("Close") }
             }
         }
     }
+}
+
+@Composable
+private fun PlaybackProgressBar(
+    modifier: Modifier = Modifier,
+    positionMs: Long,
+    durationMs: Long,
+    isLive: Boolean,
+) {
+    val progress = if (durationMs > 0L) {
+        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
+    Box(
+        modifier = modifier
+            .height(4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xCCFFFFFF)),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xCCFFFFFF)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(if (isLive) 1f else progress)
+                    .height(4.dp)
+                    .background(Color(0xFFE50914)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MinimalPlayerIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .size(50.dp)
+            .clip(RoundedCornerShape(50.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (focused) Color.Black else Color.White,
+            modifier = Modifier.size(36.dp),
+        )
+    }
+}
+
+@Composable
+private fun LargeRoundPlayButton(
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    seekEnabled: Boolean,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .size(82.dp)
+            .clip(RoundedCornerShape(82.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                when {
+                    seekEnabled && event.key == Key.DirectionLeft -> {
+                        if (event.type == KeyEventType.KeyDown) onSeekBack()
+                        true
+                    }
+                    seekEnabled && event.key == Key.DirectionRight -> {
+                        if (event.type == KeyEventType.KeyDown) onSeekForward()
+                        true
+                    }
+                    event.key in TvSelectKeys -> {
+                        if (event.type == KeyEventType.KeyUp) onClick()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            contentDescription = null,
+            tint = if (focused) Color.Black else Color.White,
+            modifier = Modifier.size(52.dp),
+        )
+    }
+}
+
+@Composable
+private fun PlayerPill(
+    label: String,
+    checked: Boolean = false,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = {})
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (checked) {
+            Icon(
+                Icons.Rounded.Check,
+                contentDescription = null,
+                tint = if (focused) Color.Black else Color.White,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Text(
+            label,
+            color = if (focused) Color.Black else Color.White,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun SmallCircleControl(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(44.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(24.dp))
+    }
+}
+
+private fun countAudioProfiles(tracks: Tracks): Int {
+    return tracks.groups
+        .filter { it.type == C.TRACK_TYPE_AUDIO }
+        .sumOf { it.length }
 }
 
 private fun formatGuideTime(event: EpgEventEntity): String {
