@@ -184,7 +184,7 @@ fun AuroraTvApp(
                         viewModel = viewModel,
                         onOpenMovie = { movieDialog = it },
                         onOpenSeries = { seriesDialog = it },
-                        onPlay = { targetType, targetId, categoryId ->
+                        onPlay = { targetType, targetId, categoryId, resumePositionMs ->
                             launchPlayback(
                                 context = context,
                                 scope = scope,
@@ -193,6 +193,7 @@ fun AuroraTvApp(
                                 targetType = targetType,
                                 targetId = targetId,
                                 categoryId = categoryId,
+                                resumePositionMs = resumePositionMs,
                             )
                         },
                     )
@@ -752,7 +753,7 @@ private fun HomeScreen(
     viewModel: MainViewModel,
     onOpenMovie: (MovieEntity) -> Unit,
     onOpenSeries: (SeriesEntity) -> Unit,
-    onPlay: (TargetType, String, String?) -> Unit,
+    onPlay: (TargetType, String, String?, Long?) -> Unit,
 ) {
     val continueWatching by viewModel.continueWatching.collectAsStateWithLifecycle(initialValue = emptyList())
     val recentChannels by viewModel.recentChannels.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -768,6 +769,7 @@ private fun HomeScreen(
             artworkUrl = it.artworkUrl,
             targetType = TargetType.from(it.targetType),
             categoryId = null,
+            resumePositionMs = it.positionMs,
         )
     }
     val favoriteMovieCards = favoriteMovies.map {
@@ -842,7 +844,7 @@ private fun HomeScreen(
             TargetType.MOVIE,
             TargetType.EPISODE,
             TargetType.CHANNEL,
-            -> onPlay(item.targetType, item.id, item.categoryId)
+            -> onPlay(item.targetType, item.id, item.categoryId, item.resumePositionMs)
 
             TargetType.SERIES -> onOpenSeries(
                 SeriesEntity(
@@ -3429,6 +3431,7 @@ private fun launchPlayback(
     targetType: TargetType,
     targetId: String,
     categoryId: String?,
+    resumePositionMs: Long? = null,
 ) {
     scope.launch {
         val descriptor = viewModel.resolvePlayback(targetType, targetId, categoryId)
@@ -3464,6 +3467,7 @@ private fun launchPlayback(
                     targetType = descriptor.targetType,
                     targetId = descriptor.targetId,
                     categoryId = descriptor.categoryId,
+                    resumePositionMs = resumePositionMs,
                 ),
             )
         }
@@ -3477,6 +3481,7 @@ private data class StripCard(
     val artworkUrl: String?,
     val targetType: TargetType,
     val categoryId: String?,
+    val resumePositionMs: Long? = null,
 )
 
 private val StripCard.focusKey: String

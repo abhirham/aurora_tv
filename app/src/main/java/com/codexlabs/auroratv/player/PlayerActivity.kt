@@ -16,25 +16,24 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -86,8 +85,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -106,22 +108,34 @@ private const val SEEK_REPEAT_INITIAL_DELAY_MS = 500L
 private const val SEEK_REPEAT_INTERVAL_MS = 100L
 private const val PLAYBACK_PROGRESS_UPDATE_MS = 100L
 
+private data class SubtitleTrackOption(
+    val label: String,
+    val mediaTrackGroup: TrackGroup,
+    val trackIndex: Int,
+    val selected: Boolean,
+)
+
 class PlayerActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_TARGET_TYPE = "extra_target_type"
         private const val EXTRA_TARGET_ID = "extra_target_id"
         private const val EXTRA_CATEGORY_ID = "extra_category_id"
+        private const val EXTRA_RESUME_POSITION_MS = "extra_resume_position_ms"
 
         fun createIntent(
             context: Context,
             targetType: TargetType,
             targetId: String,
             categoryId: String?,
+            resumePositionMs: Long? = null,
         ): Intent {
             return Intent(context, PlayerActivity::class.java).apply {
                 putExtra(EXTRA_TARGET_TYPE, targetType.rawValue)
                 putExtra(EXTRA_TARGET_ID, targetId)
                 putExtra(EXTRA_CATEGORY_ID, categoryId)
+                resumePositionMs?.takeIf { it > 0L }?.let {
+                    putExtra(EXTRA_RESUME_POSITION_MS, it)
+                }
             }
         }
     }
@@ -159,9 +173,14 @@ class PlayerActivity : ComponentActivity() {
         val targetType = TargetType.from(intent.getStringExtra(EXTRA_TARGET_TYPE).orEmpty())
         val targetId = intent.getStringExtra(EXTRA_TARGET_ID).orEmpty()
         val categoryId = intent.getStringExtra(EXTRA_CATEGORY_ID)
+        val resumePositionMs = if (intent.hasExtra(EXTRA_RESUME_POSITION_MS)) {
+            intent.getLongExtra(EXTRA_RESUME_POSITION_MS, 0L).coerceAtLeast(0L)
+        } else {
+            0L
+        }
 
         lifecycleScope.launch {
-            loadDescriptor(targetType, targetId, categoryId)
+            loadDescriptor(targetType, targetId, categoryId, resumePositionMs)
         }
 
         setContent {
@@ -265,17 +284,18 @@ class PlayerActivity : ComponentActivity() {
         targetType: TargetType,
         targetId: String,
         categoryId: String?,
+        resumePositionMs: Long = 0L,
     ) {
         runCatching {
             viewModel.resolvePlayback(targetType, targetId, categoryId)
         }.onSuccess { descriptor ->
-            playDescriptor(descriptor)
+            playDescriptor(descriptor, resumePositionMs)
         }.onFailure { throwable ->
             errorMessage = throwable.message ?: "Unable to load stream"
         }
     }
 
-    private fun playDescriptor(descriptor: PlaybackDescriptor) {
+    private fun playDescriptor(descriptor: PlaybackDescriptor, resumePositionMs: Long = 0L) {
         activeDescriptor = descriptor
         overlayVisible = true
         errorMessage = null
@@ -290,7 +310,12 @@ class PlayerActivity : ComponentActivity() {
             }
             .build()
 
-        player.setMediaItem(mediaItem)
+        val startPositionMs = resumePositionMs.takeIf { !descriptor.isLive && it > 0L }
+        if (startPositionMs != null) {
+            player.setMediaItem(mediaItem, startPositionMs)
+        } else {
+            player.setMediaItem(mediaItem)
+        }
         player.prepare()
         player.playWhenReady = true
         player.play()
@@ -403,7 +428,7 @@ private fun PlayerScreen(
     onClose: () -> Unit,
 ) {
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
-    var audioProfileCount by remember { mutableIntStateOf(countAudioProfiles(player.currentTracks)) }
+    var subtitleOptions by remember { mutableStateOf(subtitleTrackOptions(player.currentTracks)) }
 
     val guideFlow: Flow<List<EpgEventEntity>> = remember(descriptor?.targetId, descriptor?.isLive) {
         if (descriptor?.isLive == true) {
@@ -449,11 +474,11 @@ private fun PlayerScreen(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
-                audioProfileCount = countAudioProfiles(tracks)
+                subtitleOptions = subtitleTrackOptions(tracks)
             }
         }
         player.addListener(listener)
-        audioProfileCount = countAudioProfiles(player.currentTracks)
+        subtitleOptions = subtitleTrackOptions(player.currentTracks)
         onDispose {
             player.removeListener(listener)
         }
@@ -494,7 +519,11 @@ private fun PlayerScreen(
                 onNextChannel = onNextChannel,
                 onEnterPip = onEnterPip,
                 onClose = onClose,
-                showAudioOptions = audioProfileCount > 1,
+                subtitleOptions = subtitleOptions,
+                onSubtitleSelected = { option ->
+                    selectSubtitleTrack(player, option)
+                    subtitleOptions = subtitleTrackOptions(player.currentTracks, selectedOption = option)
+                },
             )
         }
 
@@ -532,7 +561,8 @@ private fun PlayerOverlay(
     onNextChannel: () -> Unit,
     onEnterPip: () -> Unit,
     onClose: () -> Unit,
-    showAudioOptions: Boolean,
+    subtitleOptions: List<SubtitleTrackOption>,
+    onSubtitleSelected: (SubtitleTrackOption?) -> Unit,
 ) {
     val now = System.currentTimeMillis()
     val currentShow = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
@@ -656,19 +686,26 @@ private fun PlayerOverlay(
                 )
             }
 
-            if (showAudioOptions) {
+            if (subtitleOptions.isNotEmpty()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PlayerPill("English [Original]")
-                    Spacer(Modifier.width(12.dp))
-                    PlayerPill("English [Original] with Subtitles", checked = true)
-                    Spacer(Modifier.width(12.dp))
-                    PlayerPill("Other...")
-                    Spacer(Modifier.width(12.dp))
-                    SmallCircleControl(icon = Icons.Rounded.Settings, onClick = onEnterPip)
+                    PlayerPill(
+                        label = "Subtitles Off",
+                        checked = subtitleOptions.none { it.selected },
+                        onClick = { onSubtitleSelected(null) },
+                    )
+                    subtitleOptions.forEach { option ->
+                        PlayerPill(
+                            label = option.label,
+                            checked = option.selected,
+                            onClick = { onSubtitleSelected(option) },
+                        )
+                    }
                 }
             }
         }
@@ -857,6 +894,7 @@ private fun LargeRoundPlayButton(
 private fun PlayerPill(
     label: String,
     checked: Boolean = false,
+    onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     Row(
@@ -866,13 +904,14 @@ private fun PlayerPill(
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
                     true
                 } else {
                     false
                 }
             }
             .focusable()
-            .clickable(role = Role.Button, onClick = {})
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -922,10 +961,64 @@ private fun SmallCircleControl(
     }
 }
 
-private fun countAudioProfiles(tracks: Tracks): Int {
+private fun subtitleTrackOptions(
+    tracks: Tracks,
+    selectedOption: SubtitleTrackOption? = null,
+): List<SubtitleTrackOption> {
+    var optionNumber = 1
     return tracks.groups
-        .filter { it.type == C.TRACK_TYPE_AUDIO }
-        .sumOf { it.length }
+        .filter { it.type == C.TRACK_TYPE_TEXT }
+        .flatMap { group ->
+            (0 until group.length)
+                .filter { trackIndex -> group.isTrackSupported(trackIndex, true) }
+                .map { trackIndex ->
+                    val selected = selectedOption?.let {
+                        it.mediaTrackGroup == group.getMediaTrackGroup() && it.trackIndex == trackIndex
+                    } ?: group.isTrackSelected(trackIndex)
+                    SubtitleTrackOption(
+                        label = subtitleTrackLabel(group.getTrackFormat(trackIndex), optionNumber++),
+                        mediaTrackGroup = group.getMediaTrackGroup(),
+                        trackIndex = trackIndex,
+                        selected = selected,
+                    )
+                }
+        }
+}
+
+private fun selectSubtitleTrack(player: Player, option: SubtitleTrackOption?) {
+    val builder = player.trackSelectionParameters
+        .buildUpon()
+        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+
+    if (option == null) {
+        builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+    } else {
+        builder
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setOverrideForType(TrackSelectionOverride(option.mediaTrackGroup, option.trackIndex))
+    }
+    player.trackSelectionParameters = builder.build()
+}
+
+private fun subtitleTrackLabel(format: Format, fallbackIndex: Int): String {
+    val label = format.label?.takeIf { it.isNotBlank() }
+    val language = format.language
+        ?.takeIf { it.isNotBlank() && it.lowercase(Locale.US) != "und" }
+        ?.let { languageTag ->
+            Locale.forLanguageTag(languageTag)
+                .getDisplayName(Locale.getDefault())
+                .takeIf { it.isNotBlank() }
+                ?: languageTag.uppercase(Locale.getDefault())
+        }
+    val role = when {
+        format.selectionFlags and C.SELECTION_FLAG_FORCED != 0 -> "Forced"
+        format.roleFlags and C.ROLE_FLAG_CAPTION != 0 -> "CC"
+        format.roleFlags and C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND != 0 -> "SDH"
+        else -> null
+    }
+    val parts = listOfNotNull(label, language, role)
+        .distinctBy { it.lowercase(Locale.getDefault()) }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" ") ?: "Subtitle $fallbackIndex"
 }
 
 private fun formatGuideTime(event: EpgEventEntity): String {
