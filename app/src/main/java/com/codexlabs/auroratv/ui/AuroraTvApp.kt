@@ -135,23 +135,20 @@ private val TvSelectKeys = setOf(
 private fun Modifier.dpadFocusRoute(
     up: FocusRequester? = null,
     down: FocusRequester? = null,
+    left: FocusRequester? = null,
+    right: FocusRequester? = null,
 ): Modifier = onPreviewKeyEvent { event ->
     if (event.type != KeyEventType.KeyDown) {
         false
     } else {
-        when (event.key) {
-            Key.DirectionUp -> up?.let {
-                it.requestFocus()
-                true
-            } ?: false
-
-            Key.DirectionDown -> down?.let {
-                it.requestFocus()
-                true
-            } ?: false
-
-            else -> false
+        val target = when (event.key) {
+            Key.DirectionUp -> up
+            Key.DirectionDown -> down
+            Key.DirectionLeft -> left
+            Key.DirectionRight -> right
+            else -> null
         }
+        target?.let { runCatching { it.requestFocus() }.isSuccess } ?: false
     }
 }
 
@@ -174,6 +171,8 @@ fun AuroraTvApp(
     var seriesDialog by remember { mutableStateOf<SeriesEntity?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val topActiveTabFocusRequester = remember { FocusRequester() }
+    val activeCategoryFocusRequester = remember { FocusRequester() }
 
     if (settings.isConfigured) {
         LaunchedEffect(settings.isConfigured) {
@@ -203,7 +202,7 @@ fun AuroraTvApp(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 38.dp, vertical = 18.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
                 StreamingTopNav(
                     selected = selectedSection,
@@ -211,6 +210,8 @@ fun AuroraTvApp(
                     isSyncing = isSyncing,
                     syncMessage = syncMessage,
                     onRefresh = { viewModel.syncAll(force = true) },
+                    activeTabFocusRequester = topActiveTabFocusRequester,
+                    activeCategoryFocusRequester = activeCategoryFocusRequester,
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -237,6 +238,8 @@ fun AuroraTvApp(
                     LibrarySection.LIVE -> LiveTvScreen(
                         settings = settings,
                         viewModel = viewModel,
+                        topActiveTabFocusRequester = topActiveTabFocusRequester,
+                        activeCategoryFocusRequester = activeCategoryFocusRequester,
                         onPlayChannel = { channel, categoryId ->
                             launchPlayback(
                                 context = context,
@@ -253,12 +256,16 @@ fun AuroraTvApp(
                     LibrarySection.MOVIES -> MovieScreen(
                         settings = settings,
                         viewModel = viewModel,
+                        topActiveTabFocusRequester = topActiveTabFocusRequester,
+                        activeCategoryFocusRequester = activeCategoryFocusRequester,
                         onOpenMovie = { movieDialog = it },
                     )
 
                     LibrarySection.SERIES -> SeriesScreen(
                         settings = settings,
                         viewModel = viewModel,
+                        topActiveTabFocusRequester = topActiveTabFocusRequester,
+                        activeCategoryFocusRequester = activeCategoryFocusRequester,
                         onOpenSeries = { seriesDialog = it },
                     )
 
@@ -344,29 +351,24 @@ private fun StreamingTopNav(
     isSyncing: Boolean,
     syncMessage: String?,
     onRefresh: () -> Unit,
+    activeTabFocusRequester: FocusRequester,
+    activeCategoryFocusRequester: FocusRequester,
 ) {
-    val searchFocusRequester = remember { FocusRequester() }
-    val homeFocusRequester = remember { FocusRequester() }
-    val liveFocusRequester = remember { FocusRequester() }
-    val moviesFocusRequester = remember { FocusRequester() }
-    val seriesFocusRequester = remember { FocusRequester() }
-    val settingsFocusRequester = remember { FocusRequester() }
     val tabs = listOf(
-        Triple(LibrarySection.HOME, "Home", homeFocusRequester),
-        Triple(LibrarySection.LIVE, "Live TV", liveFocusRequester),
-        Triple(LibrarySection.MOVIES, "Movies", moviesFocusRequester),
-        Triple(LibrarySection.SERIES, "Series", seriesFocusRequester),
+        LibrarySection.HOME to "Home",
+        LibrarySection.LIVE to "Live TV",
+        LibrarySection.MOVIES to "Movies",
+        LibrarySection.SERIES to "Series",
     )
+    val sectionsWithCategoryBar = setOf(
+        LibrarySection.LIVE,
+        LibrarySection.MOVIES,
+        LibrarySection.SERIES,
+    )
+    val downTarget = if (selected in sectionsWithCategoryBar) activeCategoryFocusRequester else null
     LaunchedEffect(selected) {
         delay(50)
-        when (selected) {
-            LibrarySection.SEARCH -> searchFocusRequester
-            LibrarySection.HOME -> homeFocusRequester
-            LibrarySection.LIVE -> liveFocusRequester
-            LibrarySection.MOVIES -> moviesFocusRequester
-            LibrarySection.SERIES -> seriesFocusRequester
-            LibrarySection.SETTINGS -> settingsFocusRequester
-        }.requestFocus()
+        runCatching { activeTabFocusRequester.requestFocus() }
     }
 
     Row(
@@ -412,22 +414,26 @@ private fun StreamingTopNav(
             TopNavIconOnly(
                 icon = Icons.Rounded.Search,
                 selected = selected == LibrarySection.SEARCH,
-                focusRequester = searchFocusRequester,
+                focusRequester = if (selected == LibrarySection.SEARCH) activeTabFocusRequester else null,
+                downFocusRequester = downTarget,
                 onClick = { onSelected(LibrarySection.SEARCH) },
             )
             Spacer(Modifier.width(10.dp))
-            tabs.forEach { (section, label, focusRequester) ->
+            tabs.forEach { (section, label) ->
+                val isSelected = selected == section
                 TopNavItem(
                     label = label,
-                    selected = selected == section,
-                    focusRequester = focusRequester,
+                    selected = isSelected,
+                    focusRequester = if (isSelected) activeTabFocusRequester else null,
+                    downFocusRequester = downTarget,
                     onClick = { onSelected(section) },
                 )
             }
             TopNavItem(
                 label = "Settings",
                 selected = selected == LibrarySection.SETTINGS,
-                focusRequester = settingsFocusRequester,
+                focusRequester = if (selected == LibrarySection.SETTINGS) activeTabFocusRequester else null,
+                downFocusRequester = downTarget,
                 onClick = { onSelected(LibrarySection.SETTINGS) },
             )
         }
@@ -461,7 +467,8 @@ private fun StreamingTopNav(
 private fun TopNavItem(
     label: String,
     selected: Boolean,
-    focusRequester: FocusRequester,
+    focusRequester: FocusRequester?,
+    downFocusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -473,11 +480,12 @@ private fun TopNavItem(
     val contentColor = if (focused) Color.Black else Color.White
     Row(
         modifier = Modifier
-            .focusRequester(focusRequester)
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .height(34.dp)
             .clip(RoundedCornerShape(34.dp))
             .background(backgroundColor)
             .onFocusChanged { focused = it.isFocused }
+            .dpadFocusRoute(down = downFocusRequester)
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
                     if (event.type == KeyEventType.KeyUp) onClick()
@@ -505,7 +513,8 @@ private fun TopNavItem(
 private fun TopNavIconOnly(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
-    focusRequester: FocusRequester,
+    focusRequester: FocusRequester?,
+    downFocusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -517,11 +526,12 @@ private fun TopNavIconOnly(
     val contentColor = if (focused) Color.Black else Color.White
     Box(
         modifier = Modifier
-            .focusRequester(focusRequester)
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .size(width = 38.dp, height = 34.dp)
             .clip(RoundedCornerShape(34.dp))
             .background(backgroundColor)
             .onFocusChanged { focused = it.isFocused }
+            .dpadFocusRoute(down = downFocusRequester)
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
                     if (event.type == KeyEventType.KeyUp) onClick()
@@ -1383,6 +1393,8 @@ private fun HomeHero(
 private fun LiveTvScreen(
     settings: AppSettings,
     viewModel: MainViewModel,
+    topActiveTabFocusRequester: FocusRequester,
+    activeCategoryFocusRequester: FocusRequester,
     onPlayChannel: (ChannelEntity, String?) -> Unit,
 ) {
     val categories by viewModel.observeCategories(LibrarySection.LIVE, settings.adultContentEnabled)
@@ -1437,6 +1449,8 @@ private fun LiveTvScreen(
             onCategorySelected = { selectedCategoryId = it.remoteId },
             focusRequester = liveRailFocusRequester,
             rightFocusRequester = liveGuideFocusRequester,
+            leftFocusRequester = topActiveTabFocusRequester,
+            activeCategoryFocusRequester = activeCategoryFocusRequester,
         )
 
         Column(
@@ -1480,6 +1494,8 @@ private fun MockupLiveRail(
     onCategorySelected: (CategoryEntity) -> Unit,
     focusRequester: FocusRequester,
     rightFocusRequester: FocusRequester,
+    leftFocusRequester: FocusRequester,
+    activeCategoryFocusRequester: FocusRequester,
 ) {
     Surface(
         modifier = modifier,
@@ -1494,20 +1510,26 @@ private fun MockupLiveRail(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val selectedCategory = categories.firstOrNull { it.remoteId == selectedCategoryId }
+            val attachActiveToHeader = selectedCategory == null
             MockupRailItem(
                 label = "Live",
                 selected = true,
                 icon = Icons.Rounded.LiveTv,
                 focusRequester = focusRequester,
                 rightFocusRequester = rightFocusRequester,
+                leftFocusRequester = leftFocusRequester,
+                activeCategoryFocusRequester = if (attachActiveToHeader) activeCategoryFocusRequester else null,
                 onClick = { selectedCategory?.let(onCategorySelected) },
             )
             categories.take(8).forEach { category ->
+                val isActive = selectedCategoryId == category.remoteId
                 MockupRailItem(
                     label = category.name,
-                    selected = selectedCategoryId == category.remoteId,
+                    selected = isActive,
                     icon = Icons.Rounded.Tv,
                     rightFocusRequester = rightFocusRequester,
+                    leftFocusRequester = leftFocusRequester,
+                    activeCategoryFocusRequester = if (isActive) activeCategoryFocusRequester else null,
                     onClick = { onCategorySelected(category) },
                 )
             }
@@ -1516,6 +1538,7 @@ private fun MockupLiveRail(
                 selected = false,
                 icon = Icons.Rounded.Favorite,
                 rightFocusRequester = rightFocusRequester,
+                leftFocusRequester = leftFocusRequester,
                 onClick = {},
             )
         }
@@ -1529,6 +1552,8 @@ private fun MockupRailItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     focusRequester: FocusRequester? = null,
     rightFocusRequester: FocusRequester? = null,
+    leftFocusRequester: FocusRequester? = null,
+    activeCategoryFocusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
     FocusCard(
@@ -1536,10 +1561,14 @@ private fun MockupRailItem(
             .fillMaxWidth()
             .height(72.dp)
             .then(
+                activeCategoryFocusRequester?.let { Modifier.focusRequester(it) } ?: Modifier,
+            )
+            .then(
                 rightFocusRequester?.let { requester ->
                     Modifier.focusProperties { right = requester }
                 } ?: Modifier,
-            ),
+            )
+            .dpadFocusRoute(left = leftFocusRequester),
         selected = selected,
         focusRequester = focusRequester,
         onClick = onClick,
@@ -1827,6 +1856,8 @@ private fun MockupEpgGrid(
 private fun MovieScreen(
     settings: AppSettings,
     viewModel: MainViewModel,
+    topActiveTabFocusRequester: FocusRequester,
+    activeCategoryFocusRequester: FocusRequester,
     onOpenMovie: (MovieEntity) -> Unit,
 ) {
     val categories by viewModel.observeCategories(LibrarySection.MOVIES, settings.adultContentEnabled)
@@ -1848,6 +1879,8 @@ private fun MovieScreen(
         categories = categories,
         selectedCategoryId = selectedCategoryId,
         onCategorySelected = { selectedCategoryId = it },
+        topActiveTabFocusRequester = topActiveTabFocusRequester,
+        activeCategoryFocusRequester = activeCategoryFocusRequester,
         isEmpty = movies.isEmpty(),
         emptyMessage = "No movies available in this group",
     ) {
@@ -1865,6 +1898,8 @@ private fun MovieScreen(
 private fun SeriesScreen(
     settings: AppSettings,
     viewModel: MainViewModel,
+    topActiveTabFocusRequester: FocusRequester,
+    activeCategoryFocusRequester: FocusRequester,
     onOpenSeries: (SeriesEntity) -> Unit,
 ) {
     val categories by viewModel.observeCategories(LibrarySection.SERIES, settings.adultContentEnabled)
@@ -1886,6 +1921,8 @@ private fun SeriesScreen(
         categories = categories,
         selectedCategoryId = selectedCategoryId,
         onCategorySelected = { selectedCategoryId = it },
+        topActiveTabFocusRequester = topActiveTabFocusRequester,
+        activeCategoryFocusRequester = activeCategoryFocusRequester,
         isEmpty = seriesItems.isEmpty(),
         emptyMessage = "No series available in this group",
     ) {
@@ -1905,11 +1942,12 @@ private fun LibraryGridLayout(
     categories: List<CategoryEntity>,
     selectedCategoryId: String?,
     onCategorySelected: (String) -> Unit,
+    topActiveTabFocusRequester: FocusRequester,
+    activeCategoryFocusRequester: FocusRequester,
     isEmpty: Boolean,
     emptyMessage: String,
     content: LazyGridScope.() -> Unit,
 ) {
-    val selectedCategoryFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
     val selectedIndex = categories.indexOfFirst { it.remoteId == selectedCategoryId }
@@ -1940,9 +1978,10 @@ private fun LibraryGridLayout(
                         .fillMaxWidth()
                         .height(44.dp)
                         .then(
-                            if (isSelected) Modifier.focusRequester(selectedCategoryFocusRequester)
+                            if (isSelected) Modifier.focusRequester(activeCategoryFocusRequester)
                             else Modifier,
-                        ),
+                        )
+                        .dpadFocusRoute(left = topActiveTabFocusRequester),
                     selected = isSelected,
                     onClick = { onCategorySelected(category.remoteId) },
                 ) {
@@ -1973,7 +2012,7 @@ private fun LibraryGridLayout(
                     .focusProperties {
                         onExit = {
                             if (requestedFocusDirection == FocusDirection.Left && selectedIndex != null) {
-                                selectedCategoryFocusRequester.requestFocus()
+                                runCatching { activeCategoryFocusRequester.requestFocus() }
                             }
                         }
                     }
