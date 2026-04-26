@@ -126,6 +126,7 @@ class PlayerActivity : ComponentActivity() {
     private var currentSettings by mutableStateOf(AppSettings())
     private var errorMessage by mutableStateOf<String?>(null)
     private var revealOverlayKeyUpCode: Int? = null
+    private var overlayActivityTick by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -160,10 +161,11 @@ class PlayerActivity : ComponentActivity() {
                     player = player,
                     descriptor = activeDescriptor,
                     overlayVisible = overlayVisible,
+                    overlayActivityTick = overlayActivityTick,
                     errorMessage = errorMessage,
-                    onToggleOverlay = { overlayVisible = !overlayVisible },
-                    onSeekBack = { seekBy(-10_000L) },
-                    onSeekForward = { seekBy(10_000L) },
+                    onHideOverlay = { overlayVisible = false },
+                    onSeekBack = { repeatCount -> seekBy(-seekStepForRepeat(repeatCount)) },
+                    onSeekForward = { repeatCount -> seekBy(seekStepForRepeat(repeatCount)) },
                     onTogglePlayPause = {
                         if (player.isPlaying) player.pause() else player.play()
                     },
@@ -188,7 +190,10 @@ class PlayerActivity : ComponentActivity() {
             return super.dispatchKeyEvent(event)
         }
 
-        val descriptor = activeDescriptor ?: return super.dispatchKeyEvent(event)
+        activeDescriptor ?: return super.dispatchKeyEvent(event)
+        if (overlayVisible) {
+            noteOverlayActivity()
+        }
         when (event.keyCode) {
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                 if (player.isPlaying) player.pause() else player.play()
@@ -199,21 +204,11 @@ class PlayerActivity : ComponentActivity() {
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_DPAD_UP,
             KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
             -> {
                 if (!overlayVisible) {
                     revealOverlay(event.keyCode)
-                    return true
-                }
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (!overlayVisible && !descriptor.isLive) {
-                    seekBy(-10_000L)
-                    return true
-                }
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (!overlayVisible && !descriptor.isLive) {
-                    seekBy(10_000L)
                     return true
                 }
             }
@@ -224,6 +219,11 @@ class PlayerActivity : ComponentActivity() {
     private fun revealOverlay(keyCode: Int) {
         overlayVisible = true
         revealOverlayKeyUpCode = keyCode
+        noteOverlayActivity()
+    }
+
+    private fun noteOverlayActivity() {
+        overlayActivityTick += 1
     }
 
     override fun onStop() {
@@ -301,8 +301,22 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun seekBy(deltaMs: Long) {
-        val newPosition = (player.currentPosition + deltaMs).coerceAtLeast(0L)
+        val duration = player.duration.takeIf { it > 0 }
+        val newPosition = if (duration != null) {
+            (player.currentPosition + deltaMs).coerceIn(0L, duration)
+        } else {
+            (player.currentPosition + deltaMs).coerceAtLeast(0L)
+        }
         player.seekTo(newPosition)
+    }
+
+    private fun seekStepForRepeat(repeatCount: Int): Long {
+        return when {
+            repeatCount >= 18 -> 60_000L
+            repeatCount >= 10 -> 30_000L
+            repeatCount >= 4 -> 15_000L
+            else -> 10_000L
+        }
     }
 
     private fun startOver() {
@@ -359,10 +373,11 @@ private fun PlayerScreen(
     player: ExoPlayer,
     descriptor: PlaybackDescriptor?,
     overlayVisible: Boolean,
+    overlayActivityTick: Int,
     errorMessage: String?,
-    onToggleOverlay: () -> Unit,
-    onSeekBack: () -> Unit,
-    onSeekForward: () -> Unit,
+    onHideOverlay: () -> Unit,
+    onSeekBack: (Int) -> Unit,
+    onSeekForward: (Int) -> Unit,
     onTogglePlayPause: () -> Unit,
     onStartOver: () -> Unit,
     onNextEpisode: () -> Unit,
@@ -400,10 +415,10 @@ private fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(overlayVisible, descriptor?.targetId) {
-        if (overlayVisible) {
+    LaunchedEffect(overlayVisible, isPlaying, descriptor?.targetId, overlayActivityTick) {
+        if (overlayVisible && isPlaying) {
             delay(4_500)
-            if (player.isPlaying) onToggleOverlay()
+            if (player.isPlaying) onHideOverlay()
         }
     }
 
@@ -493,8 +508,8 @@ private fun PlayerOverlay(
     positionMs: Long,
     durationMs: Long,
     onTogglePlayPause: () -> Unit,
-    onSeekBack: () -> Unit,
-    onSeekForward: () -> Unit,
+    onSeekBack: (Int) -> Unit,
+    onSeekForward: (Int) -> Unit,
     onStartOver: () -> Unit,
     onNextEpisode: () -> Unit,
     onPrevChannel: () -> Unit,
@@ -583,16 +598,6 @@ private fun PlayerOverlay(
                     Text("Next  ${it.title}", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-        }
-
-        if (!isPlaying) {
-            Text(
-                "A",
-                modifier = Modifier.align(Alignment.Center),
-                color = Color(0xFFE50914),
-                style = MaterialTheme.typography.displayLarge,
-                fontWeight = FontWeight.Black,
-            )
         }
 
         Column(
@@ -740,12 +745,14 @@ private fun TopPlayerAction(
 private fun LargeRoundPlayButton(
     isPlaying: Boolean,
     onClick: () -> Unit,
-    onSeekBack: () -> Unit,
-    onSeekForward: () -> Unit,
+    onSeekBack: (Int) -> Unit,
+    onSeekForward: (Int) -> Unit,
     seekEnabled: Boolean,
     focusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var leftRepeatCount by remember { mutableIntStateOf(0) }
+    var rightRepeatCount by remember { mutableIntStateOf(0) }
     Box(
         modifier = Modifier
             .size(82.dp)
@@ -756,11 +763,23 @@ private fun LargeRoundPlayButton(
             .onPreviewKeyEvent { event ->
                 when {
                     seekEnabled && event.key == Key.DirectionLeft -> {
-                        if (event.type == KeyEventType.KeyDown) onSeekBack()
+                        if (event.type == KeyEventType.KeyDown) {
+                            onSeekBack(leftRepeatCount)
+                            leftRepeatCount += 1
+                            rightRepeatCount = 0
+                        } else if (event.type == KeyEventType.KeyUp) {
+                            leftRepeatCount = 0
+                        }
                         true
                     }
                     seekEnabled && event.key == Key.DirectionRight -> {
-                        if (event.type == KeyEventType.KeyDown) onSeekForward()
+                        if (event.type == KeyEventType.KeyDown) {
+                            onSeekForward(rightRepeatCount)
+                            rightRepeatCount += 1
+                            leftRepeatCount = 0
+                        } else if (event.type == KeyEventType.KeyUp) {
+                            rightRepeatCount = 0
+                        }
                         true
                     }
                     event.key in TvSelectKeys -> {
