@@ -21,13 +21,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -67,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.codexlabs.auroratv.app.configureTvWindow
 import com.codexlabs.auroratv.data.AppSettings
 import com.codexlabs.auroratv.data.BufferProfile
 import com.codexlabs.auroratv.data.EpgEventEntity
@@ -115,6 +119,14 @@ private data class SubtitleTrackOption(
     val selected: Boolean,
 )
 
+private data class AudioTrackOption(
+    val label: String,
+    val mediaTrackGroup: TrackGroup,
+    val trackIndex: Int,
+    val selected: Boolean,
+    val isDefault: Boolean,
+)
+
 class PlayerActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_TARGET_TYPE = "extra_target_type"
@@ -154,6 +166,7 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureTvWindow(keepScreenOn = true)
 
         currentSettings = viewModel.settings.value
         player = ExoPlayer.Builder(this)
@@ -206,6 +219,13 @@ class PlayerActivity : ComponentActivity() {
                     onClose = { finish() },
                 )
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            configureTvWindow(keepScreenOn = true)
         }
     }
 
@@ -428,7 +448,9 @@ private fun PlayerScreen(
     onClose: () -> Unit,
 ) {
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var audioOptions by remember { mutableStateOf(audioTrackOptions(player.currentTracks)) }
     var subtitleOptions by remember { mutableStateOf(subtitleTrackOptions(player.currentTracks)) }
+    var languageOptionsVisible by remember { mutableStateOf(false) }
 
     val guideFlow: Flow<List<EpgEventEntity>> = remember(descriptor?.targetId, descriptor?.isLive) {
         if (descriptor?.isLive == true) {
@@ -456,10 +478,16 @@ private fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(overlayVisible, isPlaying, descriptor?.targetId, overlayActivityTick) {
-        if (overlayVisible && isPlaying) {
+    LaunchedEffect(overlayVisible, isPlaying, descriptor?.targetId, overlayActivityTick, languageOptionsVisible) {
+        if (overlayVisible && isPlaying && !languageOptionsVisible) {
             delay(4_500)
             if (player.isPlaying) onHideOverlay()
+        }
+    }
+
+    LaunchedEffect(overlayVisible) {
+        if (!overlayVisible) {
+            languageOptionsVisible = false
         }
     }
 
@@ -474,10 +502,12 @@ private fun PlayerScreen(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
+                audioOptions = audioTrackOptions(tracks)
                 subtitleOptions = subtitleTrackOptions(tracks)
             }
         }
         player.addListener(listener)
+        audioOptions = audioTrackOptions(player.currentTracks)
         subtitleOptions = subtitleTrackOptions(player.currentTracks)
         onDispose {
             player.removeListener(listener)
@@ -519,11 +549,35 @@ private fun PlayerScreen(
                 onNextChannel = onNextChannel,
                 onEnterPip = onEnterPip,
                 onClose = onClose,
+                audioOptions = audioOptions,
                 subtitleOptions = subtitleOptions,
+                onOriginalAudioSelected = { option ->
+                    selectAudioTrack(player, option)
+                    selectSubtitleTrack(player, null)
+                    audioOptions = audioTrackOptions(player.currentTracks, selectedOption = option)
+                    subtitleOptions = subtitleTrackOptions(player.currentTracks, subtitlesDisabled = true)
+                },
+                onOpenLanguageOptions = { languageOptionsVisible = true },
+            )
+        }
+
+        if (languageOptionsVisible && overlayVisible) {
+            LanguageOptionsSidebar(
+                audioOptions = audioOptions,
+                subtitleOptions = subtitleOptions,
+                onAudioSelected = { option ->
+                    selectAudioTrack(player, option)
+                    audioOptions = audioTrackOptions(player.currentTracks, selectedOption = option)
+                },
                 onSubtitleSelected = { option ->
                     selectSubtitleTrack(player, option)
-                    subtitleOptions = subtitleTrackOptions(player.currentTracks, selectedOption = option)
+                    subtitleOptions = subtitleTrackOptions(
+                        tracks = player.currentTracks,
+                        selectedOption = option,
+                        subtitlesDisabled = option == null,
+                    )
                 },
+                onDismiss = { languageOptionsVisible = false },
             )
         }
 
@@ -561,8 +615,10 @@ private fun PlayerOverlay(
     onNextChannel: () -> Unit,
     onEnterPip: () -> Unit,
     onClose: () -> Unit,
+    audioOptions: List<AudioTrackOption>,
     subtitleOptions: List<SubtitleTrackOption>,
-    onSubtitleSelected: (SubtitleTrackOption?) -> Unit,
+    onOriginalAudioSelected: (AudioTrackOption) -> Unit,
+    onOpenLanguageOptions: () -> Unit,
 ) {
     val now = System.currentTimeMillis()
     val currentShow = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
@@ -686,7 +742,20 @@ private fun PlayerOverlay(
                 )
             }
 
-            if (subtitleOptions.isNotEmpty()) {
+            val originalAudioOption = originalAudioOption(audioOptions)
+            val selectedAudioOption = audioOptions.firstOrNull { it.selected } ?: originalAudioOption
+            val selectedSubtitleOption = subtitleOptions.firstOrNull { it.selected }
+            val selectedAudioIsOriginal = selectedAudioOption != null &&
+                originalAudioOption != null &&
+                isSameTrack(selectedAudioOption, originalAudioOption)
+            val currentLanguageLabel = selectedAudioOption
+                ?.takeIf { selectedSubtitleOption != null || !selectedAudioIsOriginal }
+                ?.let { option ->
+                    val audioLabel = audioPillLabel(option, originalAudioOption)
+                    if (selectedSubtitleOption != null) "$audioLabel with Subtitles" else audioLabel
+                }
+
+            if (audioOptions.isNotEmpty() || subtitleOptions.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -694,21 +763,150 @@ private fun PlayerOverlay(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PlayerPill(
-                        label = "Subtitles Off",
-                        checked = subtitleOptions.none { it.selected },
-                        onClick = { onSubtitleSelected(null) },
-                    )
-                    subtitleOptions.forEach { option ->
+                    originalAudioOption?.let { option ->
                         PlayerPill(
-                            label = option.label,
-                            checked = option.selected,
-                            onClick = { onSubtitleSelected(option) },
+                            label = audioPillLabel(option, originalAudioOption),
+                            checked = selectedAudioIsOriginal && selectedSubtitleOption == null,
+                            onClick = { onOriginalAudioSelected(option) },
                         )
                     }
+                    currentLanguageLabel?.let { label ->
+                        PlayerPill(
+                            label = label,
+                            checked = true,
+                            onClick = onOpenLanguageOptions,
+                        )
+                    }
+                    PlayerPill(
+                        label = "Other...",
+                        checked = false,
+                        onClick = onOpenLanguageOptions,
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LanguageOptionsSidebar(
+    audioOptions: List<AudioTrackOption>,
+    subtitleOptions: List<SubtitleTrackOption>,
+    onAudioSelected: (AudioTrackOption) -> Unit,
+    onSubtitleSelected: (SubtitleTrackOption?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val firstFocusRequester = remember { FocusRequester() }
+    val originalAudioOption = originalAudioOption(audioOptions)
+
+    LaunchedEffect(Unit) {
+        delay(50)
+        firstFocusRequester.requestFocus()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(390.dp)
+                .background(Color(0xEA000000))
+                .onPreviewKeyEvent { event ->
+                    if (event.key == Key.DirectionLeft || event.key == Key.Back) {
+                        if (event.type == KeyEventType.KeyUp) onDismiss()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                .verticalScroll(rememberScrollState())
+                .padding(start = 34.dp, top = 84.dp, end = 42.dp, bottom = 54.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            TrackSectionTitle("Subtitles")
+            TrackSelectionRow(
+                label = "Off",
+                selected = subtitleOptions.none { it.selected },
+                focusRequester = firstFocusRequester,
+                onClick = { onSubtitleSelected(null) },
+            )
+            subtitleOptions.forEach { option ->
+                TrackSelectionRow(
+                    label = option.label,
+                    selected = option.selected,
+                    onClick = { onSubtitleSelected(option) },
+                )
+            }
+
+            if (audioOptions.isNotEmpty()) {
+                TrackSectionTitle("Audio")
+                audioOptions.forEach { option ->
+                    TrackSelectionRow(
+                        label = audioPillLabel(option, originalAudioOption),
+                        selected = option.selected,
+                        onClick = { onAudioSelected(option) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackSectionTitle(label: String) {
+    Text(
+        text = label,
+        color = Color.White,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Black,
+    )
+}
+
+@Composable
+private fun TrackSelectionRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50.dp))
+            .background(if (focused) Color(0xFFE8EEFF) else Color.Transparent)
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+            if (selected) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = if (focused) Color.Black else Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        Text(
+            text = label,
+            color = if (focused) Color.Black else Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -961,9 +1159,38 @@ private fun SmallCircleControl(
     }
 }
 
+private fun audioTrackOptions(
+    tracks: Tracks,
+    selectedOption: AudioTrackOption? = null,
+): List<AudioTrackOption> {
+    var optionNumber = 1
+    return tracks.groups
+        .filter { it.type == C.TRACK_TYPE_AUDIO }
+        .flatMap { group ->
+            (0 until group.length)
+                .filter { trackIndex -> group.isTrackSupported(trackIndex, true) }
+                .map { trackIndex ->
+                    val format = group.getTrackFormat(trackIndex)
+                    val selected = selectedOption?.let {
+                        isSameTrackGroup(it.mediaTrackGroup, group.getMediaTrackGroup()) &&
+                            it.trackIndex == trackIndex
+                    } ?: group.isTrackSelected(trackIndex)
+                    AudioTrackOption(
+                        label = audioTrackLabel(format, optionNumber++),
+                        mediaTrackGroup = group.getMediaTrackGroup(),
+                        trackIndex = trackIndex,
+                        selected = selected,
+                        isDefault = format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0 ||
+                            format.roleFlags and C.ROLE_FLAG_MAIN != 0,
+                    )
+                }
+        }
+}
+
 private fun subtitleTrackOptions(
     tracks: Tracks,
     selectedOption: SubtitleTrackOption? = null,
+    subtitlesDisabled: Boolean = false,
 ): List<SubtitleTrackOption> {
     var optionNumber = 1
     return tracks.groups
@@ -972,9 +1199,12 @@ private fun subtitleTrackOptions(
             (0 until group.length)
                 .filter { trackIndex -> group.isTrackSupported(trackIndex, true) }
                 .map { trackIndex ->
-                    val selected = selectedOption?.let {
-                        it.mediaTrackGroup == group.getMediaTrackGroup() && it.trackIndex == trackIndex
-                    } ?: group.isTrackSelected(trackIndex)
+                    val selected = when {
+                        subtitlesDisabled -> false
+                        selectedOption != null -> isSameTrackGroup(selectedOption.mediaTrackGroup, group.getMediaTrackGroup()) &&
+                            selectedOption.trackIndex == trackIndex
+                        else -> group.isTrackSelected(trackIndex)
+                    }
                     SubtitleTrackOption(
                         label = subtitleTrackLabel(group.getTrackFormat(trackIndex), optionNumber++),
                         mediaTrackGroup = group.getMediaTrackGroup(),
@@ -983,6 +1213,15 @@ private fun subtitleTrackOptions(
                     )
                 }
         }
+}
+
+private fun selectAudioTrack(player: Player, option: AudioTrackOption) {
+    player.trackSelectionParameters = player.trackSelectionParameters
+        .buildUpon()
+        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+        .setOverrideForType(TrackSelectionOverride(option.mediaTrackGroup, option.trackIndex))
+        .build()
 }
 
 private fun selectSubtitleTrack(player: Player, option: SubtitleTrackOption?) {
@@ -1000,16 +1239,24 @@ private fun selectSubtitleTrack(player: Player, option: SubtitleTrackOption?) {
     player.trackSelectionParameters = builder.build()
 }
 
+private fun audioTrackLabel(format: Format, fallbackIndex: Int): String {
+    val label = format.label?.takeIf { it.isNotBlank() }
+    val language = displayLanguageName(format.language)
+    val role = when {
+        format.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 -> "Audio Description"
+        format.roleFlags and C.ROLE_FLAG_COMMENTARY != 0 -> "Commentary"
+        format.roleFlags and C.ROLE_FLAG_DUB != 0 -> "Dub"
+        format.roleFlags and C.ROLE_FLAG_ALTERNATE != 0 -> "Alternate"
+        else -> null
+    }
+    val parts = listOfNotNull(label, language, role)
+        .distinctBy { it.lowercase(Locale.getDefault()) }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" ") ?: "Audio $fallbackIndex"
+}
+
 private fun subtitleTrackLabel(format: Format, fallbackIndex: Int): String {
     val label = format.label?.takeIf { it.isNotBlank() }
-    val language = format.language
-        ?.takeIf { it.isNotBlank() && it.lowercase(Locale.US) != "und" }
-        ?.let { languageTag ->
-            Locale.forLanguageTag(languageTag)
-                .getDisplayName(Locale.getDefault())
-                .takeIf { it.isNotBlank() }
-                ?: languageTag.uppercase(Locale.getDefault())
-        }
+    val language = displayLanguageName(format.language)
     val role = when {
         format.selectionFlags and C.SELECTION_FLAG_FORCED != 0 -> "Forced"
         format.roleFlags and C.ROLE_FLAG_CAPTION != 0 -> "CC"
@@ -1019,6 +1266,46 @@ private fun subtitleTrackLabel(format: Format, fallbackIndex: Int): String {
     val parts = listOfNotNull(label, language, role)
         .distinctBy { it.lowercase(Locale.getDefault()) }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" ") ?: "Subtitle $fallbackIndex"
+}
+
+private fun displayLanguageName(languageTag: String?): String? {
+    return languageTag
+        ?.takeIf { it.isNotBlank() && it.lowercase(Locale.US) != "und" }
+        ?.let { tag ->
+            val normalizedTag = tag.replace('_', '-')
+            Locale.forLanguageTag(normalizedTag)
+                .getDisplayName(Locale.getDefault())
+                .takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != normalizedTag.lowercase(Locale.getDefault()) }
+                ?: normalizedTag.uppercase(Locale.getDefault())
+        }
+}
+
+private fun originalAudioOption(audioOptions: List<AudioTrackOption>): AudioTrackOption? {
+    return audioOptions.firstOrNull { it.isDefault } ?: audioOptions.firstOrNull()
+}
+
+private fun audioPillLabel(
+    option: AudioTrackOption,
+    originalAudioOption: AudioTrackOption?,
+): String {
+    return if (originalAudioOption != null && isSameTrack(option, originalAudioOption)) {
+        option.label.withOriginalSuffix()
+    } else {
+        option.label
+    }
+}
+
+private fun String.withOriginalSuffix(): String {
+    return if (contains("original", ignoreCase = true)) this else "$this [Original]"
+}
+
+private fun isSameTrack(first: AudioTrackOption, second: AudioTrackOption): Boolean {
+    return isSameTrackGroup(first.mediaTrackGroup, second.mediaTrackGroup) &&
+        first.trackIndex == second.trackIndex
+}
+
+private fun isSameTrackGroup(first: TrackGroup, second: TrackGroup): Boolean {
+    return first == second
 }
 
 private fun formatGuideTime(event: EpgEventEntity): String {
