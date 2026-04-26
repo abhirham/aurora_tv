@@ -1912,13 +1912,8 @@ private fun LibraryGridLayout(
     val selectedCategoryFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
-    val coroutineScope = rememberCoroutineScope()
     val selectedIndex = categories.indexOfFirst { it.remoteId == selectedCategoryId }
         .takeIf { it >= 0 }
-
-    LaunchedEffect(selectedIndex) {
-        selectedIndex?.let { listState.scrollToItem(it) }
-    }
 
     LaunchedEffect(selectedCategoryId) {
         gridState.scrollToItem(0)
@@ -1975,13 +1970,6 @@ private fun LibraryGridLayout(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .onFocusChanged { state ->
-                        if (state.hasFocus) {
-                            selectedIndex?.let { index ->
-                                coroutineScope.launch { listState.scrollToItem(index) }
-                            }
-                        }
-                    }
                     .focusProperties {
                         onExit = {
                             if (requestedFocusDirection == FocusDirection.Left && selectedIndex != null) {
