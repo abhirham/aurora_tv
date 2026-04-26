@@ -26,10 +26,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -1837,99 +1840,19 @@ private fun MovieScreen(
 
     val movies by viewModel.observeMovies(selectedCategoryId, settings.adultContentEnabled)
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    val movieById = remember(movies) { movies.associateBy { it.streamId } }
-    var focusedMovieId by rememberSaveable { mutableStateOf<Long?>(null) }
-    LaunchedEffect(movies) {
-        val currentId = focusedMovieId
-        if (currentId == null || !movieById.containsKey(currentId)) {
-            focusedMovieId = movies.firstOrNull()?.streamId
-        }
-    }
-    val highlightedMovie = focusedMovieId?.let(movieById::get) ?: movies.firstOrNull()
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    LibraryGridLayout(
+        categories = categories,
+        selectedCategoryId = selectedCategoryId,
+        onCategorySelected = { selectedCategoryId = it },
+        isEmpty = movies.isEmpty(),
+        emptyMessage = "No movies available in this group",
     ) {
-        LazyRow(
-            modifier = Modifier
-                .focusRestorer()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
-                FocusCard(
-                    modifier = Modifier.height(48.dp),
-                    selected = selectedCategoryId == category.remoteId,
-                    onClick = { selectedCategoryId = category.remoteId },
-                ) {
-                    Text(
-                        text = category.name,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(22.dp),
-        ) {
-            Surface(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                shape = RoundedCornerShape(8.dp),
-                color = Color.Transparent,
-            ) {
-                if (movies.isEmpty()) {
-                    EmptyState("No movies available in this group")
-                } else {
-                    LazyVerticalGrid(
-                        modifier = Modifier
-                            .focusRestorer()
-                            .focusGroup(),
-                        columns = GridCells.Adaptive(150.dp),
-                        contentPadding = PaddingValues(2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
-                    ) {
-                        items(movies, key = { it.streamId }) { movie ->
-                            PosterTile(
-                                title = movie.name,
-                                subtitle = movie.releaseYear ?: movie.rating,
-                                artworkUrl = movie.artworkUrl,
-                                selected = movie.streamId == focusedMovieId,
-                                onClick = { onOpenMovie(movie) },
-                                onFocused = { focusedMovieId = movie.streamId },
-                            )
-                        }
-                    }
-                }
-            }
-
-            CompactMediaDetailPanel(
-                modifier = Modifier.width(430.dp).fillMaxHeight(),
-                artworkUrl = highlightedMovie?.artworkUrl,
-                title = highlightedMovie?.name ?: "Select a movie",
-                subtitle = highlightedMovie?.releaseYear ?: highlightedMovie?.rating ?: "Movie",
-                body = highlightedMovie?.plot ?: "Choose a title to inspect details.",
-                primaryLabel = "Play",
-                onPrimary = { highlightedMovie?.let(onOpenMovie) },
-                secondaryLabel = "Favorite",
-                onSecondary = {
-                    highlightedMovie?.let { movie ->
-                        viewModel.toggleFavorite(
-                            targetType = TargetType.MOVIE,
-                            targetId = movie.streamId.toString(),
-                            title = movie.name,
-                            subtitle = movie.releaseYear ?: movie.rating,
-                            artworkUrl = movie.artworkUrl,
-                        )
-                    }
-                },
+        items(movies, key = { it.streamId }) { movie ->
+            PosterTile(
+                title = movie.name,
+                artworkUrl = movie.artworkUrl,
+                onClick = { onOpenMovie(movie) },
             )
         }
     }
@@ -1955,197 +1878,117 @@ private fun SeriesScreen(
 
     val seriesItems by viewModel.observeSeries(selectedCategoryId, settings.adultContentEnabled)
         .collectAsStateWithLifecycle(initialValue = emptyList())
-    val seriesById = remember(seriesItems) { seriesItems.associateBy { it.seriesId } }
-    var focusedSeriesId by rememberSaveable { mutableStateOf<Long?>(null) }
-    LaunchedEffect(seriesItems) {
-        val currentId = focusedSeriesId
-        if (currentId == null || !seriesById.containsKey(currentId)) {
-            focusedSeriesId = seriesItems.firstOrNull()?.seriesId
+
+    LibraryGridLayout(
+        categories = categories,
+        selectedCategoryId = selectedCategoryId,
+        onCategorySelected = { selectedCategoryId = it },
+        isEmpty = seriesItems.isEmpty(),
+        emptyMessage = "No series available in this group",
+    ) {
+        items(seriesItems, key = { it.seriesId }) { series ->
+            PosterTile(
+                title = series.name,
+                artworkUrl = series.artworkUrl,
+                onClick = { onOpenSeries(series) },
+            )
         }
     }
-    val highlightedSeries = focusedSeriesId?.let(seriesById::get) ?: seriesItems.firstOrNull()
+}
 
-    Row(
+@Composable
+private fun LibraryGridLayout(
+    categories: List<CategoryEntity>,
+    selectedCategoryId: String?,
+    onCategorySelected: (String) -> Unit,
+    isEmpty: Boolean,
+    emptyMessage: String,
+    content: LazyGridScope.() -> Unit,
+) {
+    Column(
         modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        CategoryRail(
-            modifier = Modifier.width(240.dp),
-            title = "Groups",
-            categories = categories,
-            selectedCategoryId = selectedCategoryId,
-            onCategoryFocused = {},
-            onCategoryClicked = { selectedCategoryId = it.remoteId },
-            onHideCategory = { viewModel.setCategoryHidden(LibrarySection.SERIES, it.remoteId, true) },
-        )
-
-        Surface(
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-            shape = RoundedCornerShape(8.dp),
-            color = Panel.copy(alpha = 0.92f),
+        LazyRow(
+            modifier = Modifier
+                .focusRestorer()
+                .focusGroup(),
+            contentPadding = PaddingValues(vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (seriesItems.isEmpty()) {
-                EmptyState("No series available in this group")
-            } else {
-                LazyVerticalGrid(
-                    modifier = Modifier
-                        .focusRestorer()
-                        .focusGroup(),
-                    columns = GridCells.Adaptive(170.dp),
-                    contentPadding = PaddingValues(18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+            items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
+                FocusCard(
+                    modifier = Modifier.height(40.dp),
+                    selected = selectedCategoryId == category.remoteId,
+                    onClick = { onCategorySelected(category.remoteId) },
                 ) {
-                    items(seriesItems, key = { it.seriesId }) { series ->
-                        FocusCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            selected = series.seriesId == focusedSeriesId,
-                            focusTreatment = FocusTreatment.Outline,
-                            onClick = { onOpenSeries(series) },
-                            onFocused = { focusedSeriesId = series.seriesId },
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Artwork(
-                                    url = series.artworkUrl,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(0.72f),
-                                    shape = RoundedCornerShape(8.dp),
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = series.name,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = category.name,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
 
-        DetailPanel(
-            modifier = Modifier.width(400.dp).fillMaxHeight(),
-            artworkUrl = highlightedSeries?.artworkUrl,
-            title = highlightedSeries?.name ?: "Select a series",
-            subtitle = highlightedSeries?.releaseYear ?: highlightedSeries?.rating,
-            body = highlightedSeries?.plot ?: "Open a series to load seasons and episodes from the provider.",
-            primaryLabel = "Open Details",
-            onPrimary = { highlightedSeries?.let(onOpenSeries) },
-            secondaryLabel = "Favorite",
-            onSecondary = {
-                highlightedSeries?.let { series ->
-                    viewModel.toggleFavorite(
-                        targetType = TargetType.SERIES,
-                        targetId = series.seriesId.toString(),
-                        title = series.name,
-                        subtitle = series.releaseYear ?: series.rating,
-                        artworkUrl = series.artworkUrl,
-                    )
-                }
-            },
-        )
+        if (isEmpty) {
+            EmptyState(emptyMessage)
+        } else {
+            LazyVerticalGrid(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusRestorer()
+                    .focusGroup(),
+                columns = GridCells.Adaptive(180.dp),
+                contentPadding = PaddingValues(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                content = content,
+            )
+        }
     }
 }
 
 @Composable
 private fun PosterTile(
     title: String,
-    subtitle: String?,
     artworkUrl: String?,
-    selected: Boolean,
     onClick: () -> Unit,
-    onFocused: () -> Unit,
 ) {
-    FocusCard(
-        selected = selected,
-        focusTreatment = FocusTreatment.Outline,
-        onClick = onClick,
-        onFocused = onFocused,
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester),
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Artwork(
-                url = artworkUrl,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.68f),
-                shape = RoundedCornerShape(6.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(it, color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactMediaDetailPanel(
-    modifier: Modifier,
-    artworkUrl: String?,
-    title: String,
-    subtitle: String?,
-    body: String,
-    primaryLabel: String,
-    onPrimary: () -> Unit,
-    secondaryLabel: String,
-    onSecondary: () -> Unit,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Panel.copy(alpha = 0.72f),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        FocusCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.75f),
+            focusTreatment = FocusTreatment.Outline,
+            onClick = onClick,
+            onFocused = {
+                scope.launch { bringIntoViewRequester.bringIntoView() }
+            },
         ) {
             Artwork(
                 url = artworkUrl,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.75f),
-                shape = RoundedCornerShape(6.dp),
-                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(8.dp),
             )
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(it, color = MutedText, style = MaterialTheme.typography.titleMedium)
-            }
-            Text(body, color = MutedText, maxLines = 5, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.weight(1f))
-            Row(
-                modifier = Modifier
-                    .focusRestorer()
-                    .focusGroup(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TvActionButton(
-                    onClick = onPrimary,
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
-                ) {
-                    Text(primaryLabel, fontWeight = FontWeight.Bold)
-                }
-                TvActionButton(
-                    onClick = onSecondary,
-                    shape = RoundedCornerShape(6.dp),
-                    containerColor = Color(0xFF262626),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                ) {
-                    Text(secondaryLabel)
-                }
-            }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -3005,78 +2848,6 @@ private fun LiveGuideTimeline(
 }
 
 @Composable
-private fun CategoryRail(
-    modifier: Modifier,
-    title: String,
-    categories: List<CategoryEntity>,
-    selectedCategoryId: String?,
-    onCategoryFocused: (CategoryEntity) -> Unit,
-    onCategoryClicked: (CategoryEntity) -> Unit,
-    onHideCategory: (CategoryEntity) -> Unit,
-) {
-    Surface(
-        modifier = modifier.fillMaxHeight(),
-        shape = RoundedCornerShape(8.dp),
-        color = Panel.copy(alpha = 0.92f),
-    ) {
-        if (categories.isEmpty()) {
-            EmptyState("No visible groups")
-        } else {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(20.dp),
-                )
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRestorer()
-                        .focusGroup(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
-                        FocusCard(
-                            selected = selectedCategoryId == category.remoteId,
-                            onClick = { onCategoryClicked(category) },
-                            onFocused = { onCategoryFocused(category) },
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = category.name,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = if (category.isAdult) "Adult group" else "Browsable group",
-                                    color = MutedText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                    }
-                }
-                categories.firstOrNull { it.remoteId == selectedCategoryId }?.let { selected ->
-                    TvActionButton(
-                        onClick = { onHideCategory(selected) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        containerColor = Color(0xFF2A2A2A),
-                    ) {
-                        Text("Hide Current Group")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun LiveDetailPanel(
     modifier: Modifier,
     channel: ChannelEntity?,
@@ -3217,76 +2988,6 @@ private fun LiveDetailPanel(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DetailPanel(
-    modifier: Modifier,
-    artworkUrl: String?,
-    title: String,
-    subtitle: String?,
-    body: String,
-    primaryLabel: String,
-    onPrimary: () -> Unit,
-    secondaryLabel: String,
-    onSecondary: () -> Unit,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Panel.copy(alpha = 0.92f),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            Artwork(
-                url = artworkUrl,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.45f),
-                shape = RoundedCornerShape(8.dp),
-                contentScale = ContentScale.Crop,
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MutedText,
-                )
-            }
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MutedText,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            TvActionButton(
-                onClick = onPrimary,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text(primaryLabel)
-            }
-            TvActionButton(
-                onClick = onSecondary,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                containerColor = Color(0xFF2A2A2A),
-            ) {
-                Text(secondaryLabel)
             }
         }
     }

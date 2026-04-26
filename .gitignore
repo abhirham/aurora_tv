@@ -3,6 +3,7 @@
 .kotlin/
 build/
 out/
+netlflix
 
 # Android Studio and IntelliJ local files
 .idea/
