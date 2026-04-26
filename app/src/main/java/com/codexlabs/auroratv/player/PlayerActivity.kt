@@ -137,8 +137,6 @@ class PlayerActivity : ComponentActivity() {
     private var errorMessage by mutableStateOf<String?>(null)
     private var revealOverlayKeyUpCode: Int? = null
     private var overlayActivityTick by mutableIntStateOf(0)
-    private var remoteSeekKeyCode: Int? = null
-    private var remoteSeekRepeatJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -176,8 +174,8 @@ class PlayerActivity : ComponentActivity() {
                     overlayActivityTick = overlayActivityTick,
                     errorMessage = errorMessage,
                     onHideOverlay = { overlayVisible = false },
-                    onSeekBack = { seekBy(-SEEK_STEP_MS) },
-                    onSeekForward = { seekBy(SEEK_STEP_MS) },
+                    onSeekBack = { seekFromOverlay(-SEEK_STEP_MS) },
+                    onSeekForward = { seekFromOverlay(SEEK_STEP_MS) },
                     onTogglePlayPause = {
                         if (player.isPlaying) player.pause() else player.play()
                     },
@@ -193,11 +191,6 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_UP && event.keyCode == remoteSeekKeyCode) {
-            stopRemoteSeekRepeat()
-            return true
-        }
-
         if (event.action == KeyEvent.ACTION_UP && event.keyCode == revealOverlayKeyUpCode) {
             revealOverlayKeyUpCode = null
             return true
@@ -218,9 +211,6 @@ class PlayerActivity : ComponentActivity() {
         }
 
         activeDescriptor ?: return super.dispatchKeyEvent(event)
-        if (startRemoteSeekRepeatIfNeeded(event)) {
-            return true
-        }
         if (overlayVisible) {
             noteOverlayActivity()
         }
@@ -257,7 +247,6 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        stopRemoteSeekRepeat()
         persistProgress()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || !isInPictureInPictureMode) {
             player.pause()
@@ -266,7 +255,6 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        stopRemoteSeekRepeat()
         persistProgress()
         mediaSession?.release()
         player.release()
@@ -342,43 +330,9 @@ class PlayerActivity : ComponentActivity() {
         player.seekTo(newPosition)
     }
 
-    private fun startRemoteSeekRepeatIfNeeded(event: KeyEvent): Boolean {
-        val descriptor = activeDescriptor ?: return false
-        if (descriptor.isLive) return false
-        val deltaMs = when (event.keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_MEDIA_REWIND,
-            -> -SEEK_STEP_MS
-            KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-            -> SEEK_STEP_MS
-            else -> return false
-        }
-        startRemoteSeekRepeat(event.keyCode, deltaMs)
-        return true
-    }
-
-    private fun startRemoteSeekRepeat(keyCode: Int, deltaMs: Long) {
-        if (remoteSeekKeyCode == keyCode && remoteSeekRepeatJob != null) return
-        stopRemoteSeekRepeat()
-        remoteSeekKeyCode = keyCode
-        overlayVisible = true
+    private fun seekFromOverlay(deltaMs: Long) {
         noteOverlayActivity()
         seekBy(deltaMs)
-        remoteSeekRepeatJob = lifecycleScope.launch {
-            delay(SEEK_REPEAT_INITIAL_DELAY_MS)
-            while (true) {
-                seekBy(deltaMs)
-                noteOverlayActivity()
-                delay(SEEK_REPEAT_INTERVAL_MS)
-            }
-        }
-    }
-
-    private fun stopRemoteSeekRepeat() {
-        remoteSeekRepeatJob?.cancel()
-        remoteSeekRepeatJob = null
-        remoteSeekKeyCode = null
     }
 
     private fun startOver() {

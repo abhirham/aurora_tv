@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -117,6 +118,11 @@ private val TvSelectKeys = setOf(
     Key.Enter,
     Key.NumPadEnter,
 )
+
+private enum class FocusTreatment {
+    Filled,
+    Outline,
+}
 
 @Composable
 fun AuroraTvApp(
@@ -398,16 +404,17 @@ private fun TopNavItem(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val backgroundColor = when {
+        focused -> Color.White
+        selected -> Color(0xFF5B6070)
+        else -> Color.Transparent
+    }
+    val contentColor = if (focused) Color.Black else Color.White
     Row(
         modifier = Modifier
             .height(34.dp)
             .clip(RoundedCornerShape(34.dp))
-            .background(if (selected) Color(0xFF5B6070) else Color.Transparent)
-            .border(
-                width = 2.dp,
-                color = if (focused) Color.White else Color.Transparent,
-                shape = RoundedCornerShape(34.dp),
-            )
+            .background(backgroundColor)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -424,7 +431,7 @@ private fun TopNavItem(
     ) {
         Text(
             text = label,
-            color = Color.White,
+            color = contentColor,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = if (selected) FontWeight.Black else FontWeight.Bold,
             maxLines = 1,
@@ -439,12 +446,17 @@ private fun TopNavIconOnly(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val backgroundColor = when {
+        focused -> Color.White
+        selected -> Color(0xFF5B6070)
+        else -> Color.Transparent
+    }
+    val contentColor = if (focused) Color.Black else Color.White
     Box(
         modifier = Modifier
             .size(width = 38.dp, height = 34.dp)
             .clip(RoundedCornerShape(34.dp))
-            .background(if (selected) Color(0xFF5B6070) else Color.Transparent)
-            .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(34.dp))
+            .background(backgroundColor)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -458,7 +470,7 @@ private fun TopNavIconOnly(
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -511,11 +523,10 @@ private fun Header(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Button(
+                TvActionButton(
                     onClick = onRefresh,
                     enabled = !isSyncing,
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                 ) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
                     Spacer(modifier = Modifier.width(10.dp))
@@ -718,19 +729,13 @@ private fun SetupScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = darkTextFieldColors(),
                     )
-                    Button(
+                    TvActionButton(
                         onClick = { onSave(baseUrl, username, password) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         enabled = canConnect,
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = NetflixRed,
-                            contentColor = Color.White,
-                            disabledContainerColor = Color(0xFF3A3A3A),
-                            disabledContentColor = MutedText,
-                        ),
                     ) {
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(10.dp))
@@ -1197,11 +1202,10 @@ private fun HomeHero(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(22.dp))
-                Button(
+                TvActionButton(
                     onClick = { item?.let(onPlay) },
                     enabled = item != null,
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                     contentPadding = PaddingValues(horizontal = 30.dp, vertical = 14.dp),
                 ) {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null)
@@ -1480,21 +1484,20 @@ private fun MockupLiveHero(
 
                 Spacer(Modifier.height(26.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Button(
+                    TvActionButton(
                         onClick = onPlay,
                         enabled = channel != null,
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                         contentPadding = PaddingValues(horizontal = 34.dp, vertical = 16.dp),
                     ) {
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(34.dp))
                         Spacer(Modifier.width(12.dp))
                         Text("Play Live", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     }
-                    Button(
+                    TvActionButton(
                         onClick = {},
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC202020)),
+                        containerColor = Color(0xCC202020),
                         contentPadding = PaddingValues(horizontal = 28.dp, vertical = 16.dp),
                     ) {
                         Icon(Icons.Rounded.GridView, contentDescription = null, modifier = Modifier.size(30.dp))
@@ -1549,6 +1552,7 @@ private fun MockupEpgGrid(
                         FocusCard(
                             modifier = Modifier.width(230.dp).fillMaxHeight(),
                             selected = selected,
+                            focusTreatment = FocusTreatment.Outline,
                             onClick = { onPlayChannel(channel) },
                             onFocused = { onChannelFocused(channel) },
                         ) {
@@ -1780,6 +1784,7 @@ private fun SeriesScreen(
                         FocusCard(
                             modifier = Modifier.fillMaxWidth(),
                             selected = series.seriesId == focusedSeriesId,
+                            focusTreatment = FocusTreatment.Outline,
                             onClick = { onOpenSeries(series) },
                             onFocused = { focusedSeriesId = series.seriesId },
                         ) {
@@ -1840,6 +1845,7 @@ private fun PosterTile(
 ) {
     FocusCard(
         selected = selected,
+        focusTreatment = FocusTreatment.Outline,
         onClick = onClick,
         onFocused = onFocused,
     ) {
@@ -1902,18 +1908,17 @@ private fun CompactMediaDetailPanel(
             Text(body, color = MutedText, maxLines = 5, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
+                TvActionButton(
                     onClick = onPrimary,
                     shape = RoundedCornerShape(6.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                     contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
                 ) {
                     Text(primaryLabel, fontWeight = FontWeight.Bold)
                 }
-                Button(
+                TvActionButton(
                     onClick = onSecondary,
                     shape = RoundedCornerShape(6.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                    containerColor = Color(0xFF262626),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
                 ) {
                     Text(secondaryLabel)
@@ -2011,6 +2016,7 @@ private fun SearchResultSection(
                     items(items, key = { "${it.targetType.rawValue}:${it.targetId}" }) { item ->
                         FocusCard(
                             modifier = Modifier.width(172.dp),
+                            focusTreatment = FocusTreatment.Outline,
                             onClick = { onClick(item) },
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -2101,12 +2107,11 @@ private fun SettingsScreen(
                 colors = darkTextFieldColors(),
             )
 
-            Button(
+            TvActionButton(
                 onClick = { onSaveProvider(baseUrl, username, password) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isSyncing && baseUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
             ) {
                 Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(10.dp))
@@ -2186,11 +2191,10 @@ private fun SettingsScreen(
                 )
             }
 
-            Button(
+            TvActionButton(
                 onClick = onRefresh,
                 enabled = !isSyncing,
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
             ) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(10.dp))
@@ -2385,22 +2389,21 @@ private fun LiveHeroPanel(
 
                     Spacer(Modifier.height(20.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
+                        TvActionButton(
                             onClick = { highlightedChannel?.let(onPlayChannel) },
                             enabled = highlightedChannel != null,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                             contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
                         ) {
                             Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(10.dp))
                             Text("Play Live", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
-                        Button(
+                        TvActionButton(
                             onClick = onToggleFavorite,
                             enabled = highlightedChannel != null,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                            containerColor = Color(0xFF2A2A2A),
                             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
                         ) {
                             Icon(Icons.Rounded.Favorite, contentDescription = null)
@@ -2475,6 +2478,7 @@ private fun LiveChannelColumn(
                 items(channels, key = { it.streamId }) { channel ->
                     FocusCard(
                         selected = channel.streamId == highlightedChannel?.streamId,
+                        focusTreatment = FocusTreatment.Outline,
                         onClick = { onPlayChannel(channel) },
                         onFocused = { onChannelFocused(channel) },
                     ) {
@@ -2629,13 +2633,13 @@ private fun CategoryRail(
                     }
                 }
                 categories.firstOrNull { it.remoteId == selectedCategoryId }?.let { selected ->
-                    Button(
+                    TvActionButton(
                         onClick = { onHideCategory(selected) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                        containerColor = Color(0xFF2A2A2A),
                     ) {
                         Text("Hide Current Group")
                     }
@@ -2692,19 +2696,18 @@ private fun LiveDetailPanel(
                         color = MutedText,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
+                        TvActionButton(
                             onClick = onPlay,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                         ) {
                             Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Play Live")
                         }
-                        Button(
+                        TvActionButton(
                             onClick = onToggleFavorite,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                            containerColor = Color(0xFF2A2A2A),
                         ) {
                             Icon(Icons.Rounded.Favorite, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -2843,19 +2846,18 @@ private fun DetailPanel(
                 color = MutedText,
             )
             Spacer(modifier = Modifier.weight(1f))
-            Button(
+            TvActionButton(
                 onClick = onPrimary,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
             ) {
                 Text(primaryLabel)
             }
-            Button(
+            TvActionButton(
                 onClick = onSecondary,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A2A)),
+                containerColor = Color(0xFF2A2A2A),
             ) {
                 Text(secondaryLabel)
             }
@@ -2900,17 +2902,16 @@ private fun MovieDialog(
                     Text(movie.plot ?: "No plot available.", style = MaterialTheme.typography.bodyLarge, color = MutedText, maxLines = 7, overflow = TextOverflow.Ellipsis)
                     Spacer(modifier = Modifier.weight(1f))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
+                        TvActionButton(
                             onClick = onPlay,
                             shape = RoundedCornerShape(6.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = NetflixRed),
                             contentPadding = PaddingValues(horizontal = 30.dp, vertical = 12.dp),
                         ) {
                             Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text("Play")
                         }
-                        Button(
+                        TvActionButton(
                             onClick = {
                                 viewModel.toggleFavorite(
                                     targetType = TargetType.MOVIE,
@@ -2921,7 +2922,7 @@ private fun MovieDialog(
                                 )
                             },
                             shape = RoundedCornerShape(6.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                            containerColor = Color(0xFF262626),
                             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                         ) {
                             Text("Favorite")
@@ -3018,6 +3019,7 @@ private fun SeriesDialog(
                             ) {
                                 items(seasons[selectedSeason].orEmpty(), key = { it.episodeId }) { episode ->
                                     FocusCard(
+                                        focusTreatment = FocusTreatment.Outline,
                                         onClick = { onPlayEpisode(episode) },
                                     ) {
                                         Row(
@@ -3055,7 +3057,7 @@ private fun SeriesDialog(
                         }
                     }
 
-                    Button(
+                    TvActionButton(
                         onClick = {
                             viewModel.toggleFavorite(
                                 targetType = TargetType.SERIES,
@@ -3100,6 +3102,7 @@ private fun HomeStrip(
                     items(items, key = { "${it.targetType.rawValue}:${it.id}" }) { item ->
                         FocusCard(
                             modifier = Modifier.width(176.dp),
+                            focusTreatment = FocusTreatment.Outline,
                             onClick = { onClick(item) },
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -3133,16 +3136,24 @@ private fun HomeStrip(
 private fun FocusCard(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    focusTreatment: FocusTreatment = FocusTreatment.Filled,
     onClick: () -> Unit,
     onFocused: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val isOutline = focusTreatment == FocusTreatment.Outline
     val borderColor = when {
-        focused -> NetflixRed
-        selected -> NetflixRed.copy(alpha = 0.85f)
+        isOutline && focused -> Color.White
+        isOutline && selected -> Color.White.copy(alpha = 0.58f)
         else -> Color.Transparent
     }
+    val containerColor = when {
+        !isOutline && focused -> Color.White
+        selected -> Color(0xFF303030)
+        else -> PanelRaised.copy(alpha = 0.62f)
+    }
+    val contentColor = if (!isOutline && focused) Color.Black else Color.White
 
     Surface(
         modifier = modifier
@@ -3161,11 +3172,8 @@ private fun FocusCard(
             .focusable()
             .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(8.dp),
-        color = when {
-            selected -> Color(0xFF242424)
-            focused -> Color(0xFF292929)
-            else -> PanelRaised.copy(alpha = 0.62f)
-        },
+        color = containerColor,
+        contentColor = contentColor,
         tonalElevation = 0.dp,
     ) {
         Box(
@@ -3176,6 +3184,35 @@ private fun FocusCard(
             content()
         }
     }
+}
+
+@Composable
+private fun TvActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    shape: RoundedCornerShape = RoundedCornerShape(8.dp),
+    containerColor: Color = NetflixRed,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    content: @Composable RowScope.() -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val focusActive = enabled && focused
+
+    Button(
+        onClick = onClick,
+        modifier = modifier.onFocusChanged { focused = it.isFocused },
+        enabled = enabled,
+        shape = shape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (focusActive) Color.White else containerColor,
+            contentColor = if (focusActive) Color.Black else Color.White,
+            disabledContainerColor = Color(0xFF3A3A3A),
+            disabledContentColor = MutedText,
+        ),
+        contentPadding = contentPadding,
+        content = content,
+    )
 }
 
 @Composable
