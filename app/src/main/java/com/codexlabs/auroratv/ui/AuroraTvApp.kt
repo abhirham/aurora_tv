@@ -1905,26 +1905,32 @@ private fun LibraryGridLayout(
     emptyMessage: String,
     content: LazyGridScope.() -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        LazyRow(
+        LazyColumn(
             modifier = Modifier
+                .width(260.dp)
+                .fillMaxHeight()
                 .focusRestorer()
                 .focusGroup(),
             contentPadding = PaddingValues(vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
                 FocusCard(
-                    modifier = Modifier.height(40.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
                     selected = selectedCategoryId == category.remoteId,
                     onClick = { onCategorySelected(category.remoteId) },
                 ) {
                     Text(
                         text = category.name,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -1935,11 +1941,14 @@ private fun LibraryGridLayout(
         }
 
         if (isEmpty) {
-            EmptyState(emptyMessage)
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                EmptyState(emptyMessage)
+            }
         } else {
             LazyVerticalGrid(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxHeight()
                     .focusRestorer()
                     .focusGroup(),
                 columns = GridCells.Adaptive(180.dp),
