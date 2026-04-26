@@ -70,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -1898,6 +1899,7 @@ private fun SeriesScreen(
     }
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun LibraryGridLayout(
     categories: List<CategoryEntity>,
@@ -1981,7 +1983,11 @@ private fun LibraryGridLayout(
                         }
                     }
                     .focusProperties {
-                        if (selectedIndex != null) left = selectedCategoryFocusRequester
+                        onExit = {
+                            if (requestedFocusDirection == FocusDirection.Left && selectedIndex != null) {
+                                selectedCategoryFocusRequester.requestFocus()
+                            }
+                        }
                     }
                     .focusRestorer()
                     .focusGroup(),
