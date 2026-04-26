@@ -828,6 +828,7 @@ private fun HomeScreen(
             .take(12)
     }
     var highlightedItem by remember { mutableStateOf<StripCard?>(null) }
+    var expandedPrimaryItemKey by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(primaryCards) {
         val current = highlightedItem
@@ -881,27 +882,33 @@ private fun HomeScreen(
                 Text("Your synced library will appear here", color = MutedText, style = MaterialTheme.typography.titleLarge)
             }
         } else {
+            val primaryRowCards = primaryCards.take(4)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(262.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                NetflixFeatureTile(
-                    item = primaryCards.first(),
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    onFocused = { highlightedItem = primaryCards.first() },
-                    onClick = { openItem(primaryCards.first()) },
-                )
-                primaryCards.drop(1).take(3).forEach { item ->
-                    NetflixPosterTile(
-                        item = item,
-                        modifier = Modifier
+                primaryRowCards.forEach { item ->
+                    val itemKey = item.focusKey
+                    val expanded = expandedPrimaryItemKey == itemKey
+                    val tileModifier = if (expanded) {
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    } else {
+                        Modifier
                             .width(178.dp)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                    }
+                    NetflixPrimaryTile(
+                        item = item,
+                        expanded = expanded,
+                        modifier = tileModifier,
                         onFocused = { highlightedItem = item },
+                        onFocusChanged = { focused ->
+                            expandedPrimaryItemKey = if (focused) itemKey else expandedPrimaryItemKey.takeUnless { it == itemKey }
+                        },
                         onClick = { openItem(item) },
                     )
                 }
@@ -1010,6 +1017,94 @@ private fun NetflixRailTile(
                 shape = RoundedCornerShape(8.dp),
                 contentScale = ContentScale.Crop,
             )
+        }
+    }
+}
+
+@Composable
+private fun NetflixPrimaryTile(
+    item: StripCard,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    onFocused: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        modifier = modifier
+            .onFocusChanged {
+                focused = it.isFocused
+                onFocusChanged(it.isFocused)
+                if (it.isFocused) onFocused()
+            }
+            .onPreviewKeyEvent { event ->
+                if (event.key in TvSelectKeys) {
+                    if (event.type == KeyEventType.KeyUp) onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        tonalElevation = 0.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp)),
+        ) {
+            Artwork(
+                url = item.artworkUrl,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(8.dp),
+                contentScale = ContentScale.Crop,
+            )
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color(0xAA000000)),
+                                startY = 180f,
+                            ),
+                        ),
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(shape = RoundedCornerShape(40.dp), color = Color.White) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Text("Play", color = Color.Black, fontWeight = FontWeight.Black)
+                        }
+                    }
+                    item.subtitle?.takeIf { it.isNotBlank() }?.let {
+                        Surface(shape = RoundedCornerShape(6.dp), color = Color(0xB0000000)) {
+                            Text(
+                                text = it,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -3383,3 +3478,6 @@ private data class StripCard(
     val targetType: TargetType,
     val categoryId: String?,
 )
+
+private val StripCard.focusKey: String
+    get() = "${targetType.rawValue}:$id"
