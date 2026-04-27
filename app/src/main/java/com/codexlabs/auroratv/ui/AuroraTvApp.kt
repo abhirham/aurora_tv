@@ -453,13 +453,23 @@ private fun StreamingTopNav(
     }
 
     syncMessage?.takeIf { isSyncing && it.isNotBlank() }?.let {
-        Text(
-            text = it,
-            color = NetflixRed,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                color = NetflixRed,
+                strokeWidth = 2.dp,
+            )
+            Text(
+                text = it,
+                color = NetflixRed,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -602,7 +612,15 @@ private fun Header(
                     enabled = !isSyncing,
                     shape = RoundedCornerShape(8.dp),
                 ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null)
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MutedText,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null)
+                    }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(if (isSyncing) "Syncing..." else "Refresh")
                 }
@@ -837,6 +855,8 @@ private fun HomeScreen(
     val favoriteChannels by viewModel.favoriteChannels.collectAsStateWithLifecycle(initialValue = emptyList())
     val favoriteMovies by viewModel.favoriteMovies.collectAsStateWithLifecycle(initialValue = emptyList())
     val favoriteSeries by viewModel.favoriteSeries.collectAsStateWithLifecycle(initialValue = emptyList())
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val stats by viewModel.libraryStats.collectAsStateWithLifecycle()
 
     val continueCards = continueWatching.map {
         StripCard(
@@ -952,13 +972,18 @@ private fun HomeScreen(
         )
 
         if (primaryCards.isEmpty()) {
+            val libraryEmpty = stats.liveChannels == 0 && stats.movies == 0 && stats.series == 0
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(440.dp),
-                contentAlignment = Alignment.CenterStart,
+                contentAlignment = if (isSyncing && libraryEmpty) Alignment.Center else Alignment.CenterStart,
             ) {
-                Text("Your synced library will appear here", color = MutedText, style = MaterialTheme.typography.titleLarge)
+                if (isSyncing && libraryEmpty) {
+                    LoadingState(message = "Building your library...")
+                } else {
+                    Text("Your synced library will appear here", color = MutedText, style = MaterialTheme.typography.titleLarge)
+                }
             }
         } else {
             val primaryRowCards = primaryCards.take(4)
@@ -1399,6 +1424,7 @@ private fun LiveTvScreen(
 ) {
     val categories by viewModel.observeCategories(LibrarySection.LIVE, settings.adultContentEnabled)
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
     var selectedCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(categories) {
@@ -1450,6 +1476,7 @@ private fun LiveTvScreen(
             focusRequester = liveRailFocusRequester,
             rightFocusRequester = liveGuideFocusRequester,
             leftFocusRequester = topActiveTabFocusRequester,
+            topNavFocusRequester = topActiveTabFocusRequester,
             activeCategoryFocusRequester = activeCategoryFocusRequester,
         )
 
@@ -1479,6 +1506,7 @@ private fun LiveTvScreen(
                 railFocusRequester = liveRailFocusRequester,
                 heroFocusRequester = liveHeroPlayFocusRequester,
                 initialFocusRequester = liveGuideFocusRequester,
+                isLoading = isSyncing && channels.isEmpty(),
                 onChannelFocused = { focusedChannelId = it.streamId },
                 onPlayChannel = { onPlayChannel(it, selectedCategoryId) },
             )
@@ -1495,8 +1523,18 @@ private fun MockupLiveRail(
     focusRequester: FocusRequester,
     rightFocusRequester: FocusRequester,
     leftFocusRequester: FocusRequester,
+    topNavFocusRequester: FocusRequester,
     activeCategoryFocusRequester: FocusRequester,
 ) {
+    val listState = rememberLazyListState()
+    val selectedIndex = categories.indexOfFirst { it.remoteId == selectedCategoryId }
+
+    LaunchedEffect(selectedIndex, categories.size) {
+        if (selectedIndex >= 0) {
+            listState.scrollToItem(selectedIndex)
+        }
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
@@ -1504,42 +1542,73 @@ private fun MockupLiveRail(
     ) {
         Column(
             modifier = Modifier
-                .padding(10.dp)
-                .focusRestorer()
-                .focusGroup(),
+                .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val selectedCategory = categories.firstOrNull { it.remoteId == selectedCategoryId }
-            val attachActiveToHeader = selectedCategory == null
-            MockupRailItem(
+            MockupRailHeader(
                 label = "Live",
-                selected = true,
                 icon = Icons.Rounded.LiveTv,
-                focusRequester = focusRequester,
-                rightFocusRequester = rightFocusRequester,
-                leftFocusRequester = leftFocusRequester,
-                activeCategoryFocusRequester = if (attachActiveToHeader) activeCategoryFocusRequester else null,
-                onClick = { selectedCategory?.let(onCategorySelected) },
             )
-            categories.take(8).forEach { category ->
-                val isActive = selectedCategoryId == category.remoteId
-                MockupRailItem(
-                    label = category.name,
-                    selected = isActive,
-                    icon = Icons.Rounded.Tv,
-                    rightFocusRequester = rightFocusRequester,
-                    leftFocusRequester = leftFocusRequester,
-                    activeCategoryFocusRequester = if (isActive) activeCategoryFocusRequester else null,
-                    onClick = { onCategorySelected(category) },
-                )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .focusRestorer()
+                    .focusGroup(),
+                contentPadding = PaddingValues(bottom = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(categories, key = { _, category -> "${category.section}:${category.remoteId}" }) { index, category ->
+                    val isActive = selectedCategoryId == category.remoteId
+                    val attachRequesterToItem = isActive || (selectedIndex < 0 && index == 0)
+                    MockupRailItem(
+                        label = category.name,
+                        selected = isActive,
+                        icon = Icons.Rounded.Tv,
+                        focusRequester = if (attachRequesterToItem) focusRequester else null,
+                        rightFocusRequester = rightFocusRequester,
+                        leftFocusRequester = leftFocusRequester,
+                        upFocusRequester = if (index == 0) topNavFocusRequester else null,
+                        activeCategoryFocusRequester = if (attachRequesterToItem) activeCategoryFocusRequester else null,
+                        onClick = { onCategorySelected(category) },
+                    )
+                }
             }
-            MockupRailItem(
-                label = "Favorites",
-                selected = false,
-                icon = Icons.Rounded.Favorite,
-                rightFocusRequester = rightFocusRequester,
-                leftFocusRequester = leftFocusRequester,
-                onClick = {},
+        }
+    }
+}
+
+@Composable
+private fun MockupRailHeader(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF303030),
+        contentColor = Color.White,
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(icon, contentDescription = null)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                label,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -1553,6 +1622,7 @@ private fun MockupRailItem(
     focusRequester: FocusRequester? = null,
     rightFocusRequester: FocusRequester? = null,
     leftFocusRequester: FocusRequester? = null,
+    upFocusRequester: FocusRequester? = null,
     activeCategoryFocusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
@@ -1568,7 +1638,7 @@ private fun MockupRailItem(
                     Modifier.focusProperties { right = requester }
                 } ?: Modifier,
             )
-            .dpadFocusRoute(left = leftFocusRequester),
+            .dpadFocusRoute(up = upFocusRequester, left = leftFocusRequester),
         selected = selected,
         focusRequester = focusRequester,
         onClick = onClick,
@@ -1743,6 +1813,7 @@ private fun MockupEpgGrid(
     railFocusRequester: FocusRequester,
     heroFocusRequester: FocusRequester,
     initialFocusRequester: FocusRequester,
+    isLoading: Boolean = false,
     onChannelFocused: (ChannelEntity) -> Unit,
     onPlayChannel: (ChannelEntity) -> Unit,
 ) {
@@ -1761,7 +1832,11 @@ private fun MockupEpgGrid(
         }
 
         if (rows.isEmpty()) {
-            EmptyState("No channels in this group")
+            if (isLoading) {
+                LoadingState(message = "Loading live channels...")
+            } else {
+                EmptyState("No channels in this group")
+            }
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -1874,6 +1949,7 @@ private fun MovieScreen(
 
     val movies by viewModel.observeMovies(selectedCategoryId, settings.adultContentEnabled)
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
     LibraryGridLayout(
         categories = categories,
@@ -1883,6 +1959,8 @@ private fun MovieScreen(
         activeCategoryFocusRequester = activeCategoryFocusRequester,
         isEmpty = movies.isEmpty(),
         emptyMessage = "No movies available in this group",
+        isLoading = isSyncing && (categories.isEmpty() || movies.isEmpty()),
+        loadingMessage = "Loading movies...",
     ) {
         items(movies, key = { it.streamId }) { movie ->
             PosterTile(
@@ -1916,6 +1994,7 @@ private fun SeriesScreen(
 
     val seriesItems by viewModel.observeSeries(selectedCategoryId, settings.adultContentEnabled)
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
     LibraryGridLayout(
         categories = categories,
@@ -1925,6 +2004,8 @@ private fun SeriesScreen(
         activeCategoryFocusRequester = activeCategoryFocusRequester,
         isEmpty = seriesItems.isEmpty(),
         emptyMessage = "No series available in this group",
+        isLoading = isSyncing && (categories.isEmpty() || seriesItems.isEmpty()),
+        loadingMessage = "Loading series...",
     ) {
         items(seriesItems, key = { it.seriesId }) { series ->
             PosterTile(
@@ -1946,6 +2027,8 @@ private fun LibraryGridLayout(
     activeCategoryFocusRequester: FocusRequester,
     isEmpty: Boolean,
     emptyMessage: String,
+    isLoading: Boolean = false,
+    loadingMessage: String = "Loading...",
     content: LazyGridScope.() -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -2001,7 +2084,11 @@ private fun LibraryGridLayout(
 
         if (isEmpty) {
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                EmptyState(emptyMessage)
+                if (isLoading) {
+                    LoadingState(message = loadingMessage)
+                } else {
+                    EmptyState(emptyMessage)
+                }
             }
         } else {
             LazyVerticalGrid(
@@ -2348,7 +2435,15 @@ private fun SettingsScreen(
                 focusRequester = connectFocusRequester,
                 shape = RoundedCornerShape(8.dp),
             ) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MutedText,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(if (isSyncing) "Syncing" else "Connect And Sync")
             }
@@ -2470,7 +2565,15 @@ private fun SettingsScreen(
                 modifier = Modifier.focusProperties { up = bufferProfileFocusRequester },
                 shape = RoundedCornerShape(8.dp),
             ) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null)
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MutedText,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Rounded.Refresh, contentDescription = null)
+                }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(if (isSyncing) "Syncing..." else "Refresh Library Now")
             }
@@ -3552,6 +3655,33 @@ private fun EmptyState(message: String) {
             style = MaterialTheme.typography.titleLarge,
             color = MutedText,
         )
+    }
+}
+
+@Composable
+private fun LoadingState(
+    message: String = "Loading...",
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                color = NetflixRed,
+                strokeWidth = 4.dp,
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.titleMedium,
+                color = MutedText,
+            )
+        }
     }
 }
 

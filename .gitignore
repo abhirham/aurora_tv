@@ -40,6 +40,10 @@ signing.properties
 # Logs
 *.log
 
+# Local diagnostics captures
+diagnostics/*.pid
+diagnostics/repro-markers.txt
+
 # OS and editor noise
 .DS_Store
 Thumbs.db

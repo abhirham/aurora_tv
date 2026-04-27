@@ -40,8 +40,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -486,6 +486,7 @@ private fun PlayerScreen(
     onClose: () -> Unit,
 ) {
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var playbackState by remember { mutableIntStateOf(player.playbackState) }
     var audioOptions by remember { mutableStateOf(audioTrackOptions(player.currentTracks)) }
     var subtitleOptions by remember { mutableStateOf(subtitleTrackOptions(player.currentTracks)) }
     var languageOptionsVisible by remember { mutableStateOf(false) }
@@ -535,6 +536,10 @@ private fun PlayerScreen(
                 isPlaying = isPlayingState
             }
 
+            override fun onPlaybackStateChanged(state: Int) {
+                playbackState = state
+            }
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 isPlaying = false
             }
@@ -545,6 +550,7 @@ private fun PlayerScreen(
             }
         }
         player.addListener(listener)
+        playbackState = player.playbackState
         audioOptions = audioTrackOptions(player.currentTracks)
         subtitleOptions = subtitleTrackOptions(player.currentTracks)
         onDispose {
@@ -617,6 +623,26 @@ private fun PlayerScreen(
                 },
                 onDismiss = { languageOptionsVisible = false },
             )
+        }
+
+        val showLoader = errorMessage.isNullOrBlank() && (
+            descriptor == null ||
+                playbackState == Player.STATE_BUFFERING ||
+                (playbackState == Player.STATE_IDLE && !isPlaying)
+        )
+        if (showLoader) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x66000000)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(72.dp),
+                    color = Color.White,
+                    strokeWidth = 5.dp,
+                )
+            }
         }
 
         errorMessage?.takeIf { it.isNotBlank() }?.let { message ->
@@ -871,11 +897,6 @@ private fun PlayerOverlay(
                     PlayerPill(
                         label = "Other...",
                         checked = false,
-                        onClick = onOpenLanguageOptions,
-                    )
-                    PlayerIconPill(
-                        icon = Icons.Rounded.Settings,
-                        contentDescription = "Audio and subtitle settings",
                         onClick = onOpenLanguageOptions,
                     )
                 }
@@ -1238,41 +1259,6 @@ private fun PlayerPill(
     }
 }
 
-@Composable
-private fun PlayerIconPill(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val contentColor = if (focused) Color.Black else PlayerControlPillContentColor
-    Box(
-        modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(50.dp))
-            .background(if (focused) PlayerControlPillFocusedColor else PlayerControlPillColor)
-            .onFocusChanged { focused = it.isFocused }
-            .onPreviewKeyEvent { event ->
-                if (event.key in TvSelectKeys) {
-                    if (event.type == KeyEventType.KeyUp) onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            tint = contentColor,
-            modifier = Modifier.size(18.dp),
-        )
-    }
-}
-
 private fun audioTrackOptions(
     tracks: Tracks,
     selectedOption: AudioTrackOption? = null,
@@ -1396,16 +1382,15 @@ private fun trackLanguageName(format: Format): String? {
 }
 
 private fun displayLanguageName(languageTag: String?): String? {
-    return languageTag
-        ?.takeIf { it.isNotBlank() && it.lowercase(Locale.US) != "und" }
-        ?.let { tag ->
-            val normalizedTag = tag.replace('_', '-')
-            if (!isLikelyLanguageTag(normalizedTag)) return@let null
-            Locale.forLanguageTag(normalizedTag)
-                .getDisplayName(Locale.getDefault())
-                .takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != normalizedTag.lowercase(Locale.getDefault()) }
-                ?: normalizedTag.uppercase(Locale.getDefault())
-        }
+    val tag = languageTag?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    if (tag.lowercase(Locale.US) == "und") return "und"
+
+    val normalizedTag = tag.replace('_', '-')
+    if (!isLikelyLanguageTag(normalizedTag)) return null
+    return Locale.forLanguageTag(normalizedTag)
+        .getDisplayName(Locale.getDefault())
+        .takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != normalizedTag.lowercase(Locale.getDefault()) }
+        ?: normalizedTag.uppercase(Locale.getDefault())
 }
 
 private fun isLikelyLanguageTag(languageTag: String): Boolean {
