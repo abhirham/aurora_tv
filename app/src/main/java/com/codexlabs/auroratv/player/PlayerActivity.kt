@@ -14,6 +14,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +65,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -69,8 +73,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.codexlabs.auroratv.app.configureTvWindow
@@ -114,6 +120,13 @@ private const val SEEK_STEP_MS = 10_000L
 private const val SEEK_REPEAT_INITIAL_DELAY_MS = 500L
 private const val SEEK_REPEAT_INTERVAL_MS = 100L
 private const val PLAYBACK_PROGRESS_UPDATE_MS = 100L
+
+private val PlayerOverlayHorizontalPadding = 56.dp
+private val PlayerOverlayTopPadding = 44.dp
+private val PlayerOverlayBottomPadding = 42.dp
+private val PlayerControlPillColor = Color(0x778A98A6)
+private val PlayerControlPillFocusedColor = Color.White
+private val PlayerControlPillContentColor = Color.White
 
 private val KnownTrackLanguageNames: List<String> by lazy {
     Locale.getAvailableLocales()
@@ -670,61 +683,101 @@ private fun PlayerOverlay(
                 ),
             ),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 64.dp, top = 56.dp)
-                .focusRestorer()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
-            verticalAlignment = Alignment.Top,
+                .padding(start = PlayerOverlayHorizontalPadding, top = PlayerOverlayTopPadding),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            TopPlayerAction(
-                icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                label = "Back",
-                onClick = onClose,
-            )
-            if (canStartOver) {
+            Row(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TopPlayerAction(
-                    icon = Icons.Rounded.Replay,
-                    label = "Start Over",
-                    onClick = onStartOver,
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    onClick = onClose,
                 )
-                if (descriptor?.nextEpisodeId != null) {
+                if (canStartOver) {
                     TopPlayerAction(
-                        icon = Icons.Rounded.SkipNext,
-                        label = "Next Episode",
-                        onClick = onNextEpisode,
+                        icon = Icons.Rounded.Replay,
+                        contentDescription = "Start Over",
+                        onClick = onStartOver,
                     )
+                    if (descriptor?.nextEpisodeId != null) {
+                        TopPlayerAction(
+                            icon = Icons.Rounded.SkipNext,
+                            contentDescription = "Next Episode",
+                            onClick = onNextEpisode,
+                        )
+                    }
                 }
             }
+            Text(
+                "OPTIONS",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.sp,
+                modifier = Modifier.padding(start = 5.dp),
+            )
         }
 
         Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 54.dp, end = 62.dp),
+                .padding(top = PlayerOverlayTopPadding, end = PlayerOverlayHorizontalPadding),
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Dolby Vision", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
             Text(
                 descriptor?.title ?: "Loading stream",
+                modifier = Modifier.widthIn(max = 560.dp),
                 color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             descriptor?.subtitle?.let {
-                Text(it, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    it,
+                    modifier = Modifier.widthIn(max = 560.dp),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             if (isLive) {
                 currentShow?.let {
-                    Text("Now  ${it.title}", color = Color(0xFFE0E0E0), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "Now  ${it.title}",
+                        modifier = Modifier.widthIn(max = 560.dp),
+                        color = Color(0xFFE0E0E0),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 nextShow?.let {
-                    Text("Next  ${it.title}", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "Next  ${it.title}",
+                        modifier = Modifier.widthIn(max = 560.dp),
+                        color = Color(0xFFBDBDBD),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -733,15 +786,19 @@ private fun PlayerOverlay(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(start = 64.dp, end = 64.dp, bottom = 54.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+                .padding(
+                    start = PlayerOverlayHorizontalPadding,
+                    end = PlayerOverlayHorizontalPadding,
+                    bottom = PlayerOverlayBottomPadding,
+                ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRestorer()
                     .focusGroup(),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LargeRoundPlayButton(
@@ -755,7 +812,8 @@ private fun PlayerOverlay(
                 Text(
                     text = if (isLive) "LIVE" else formatProgressTime(positionMs),
                     color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 17.sp,
+                    lineHeight = 19.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 PlaybackProgressBar(
@@ -767,7 +825,8 @@ private fun PlayerOverlay(
                 Text(
                     text = if (isLive) "LIVE" else formatProgressTime(durationMs),
                     color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 17.sp,
+                    lineHeight = 19.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -792,7 +851,7 @@ private fun PlayerOverlay(
                         .horizontalScroll(rememberScrollState())
                         .focusRestorer()
                         .focusGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     originalAudioOption?.let { option ->
@@ -812,6 +871,11 @@ private fun PlayerOverlay(
                     PlayerPill(
                         label = "Other...",
                         checked = false,
+                        onClick = onOpenLanguageOptions,
+                    )
+                    PlayerIconPill(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = "Audio and subtitle settings",
                         onClick = onOpenLanguageOptions,
                     )
                 }
@@ -841,7 +905,7 @@ private fun LanguageOptionsSidebar(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .width(390.dp)
+                .width(380.dp)
                 .background(Color(0xEA000000))
                 .focusRestorer()
                 .focusGroup()
@@ -854,32 +918,36 @@ private fun LanguageOptionsSidebar(
                     }
                 }
                 .verticalScroll(rememberScrollState())
-                .padding(start = 34.dp, top = 84.dp, end = 42.dp, bottom = 54.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp),
+                .padding(start = 30.dp, top = 80.dp, end = 34.dp, bottom = 50.dp),
+            verticalArrangement = Arrangement.spacedBy(30.dp),
         ) {
-            TrackSectionTitle("Closed captions")
-            TrackSelectionRow(
-                label = "Off",
-                selected = subtitleOptions.none { it.selected },
-                focusRequester = firstFocusRequester,
-                onClick = { onSubtitleSelected(null) },
-            )
-            subtitleOptions.forEach { option ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                TrackSectionTitle("Subtitles")
                 TrackSelectionRow(
-                    label = option.label,
-                    selected = option.selected,
-                    onClick = { onSubtitleSelected(option) },
+                    label = "Off",
+                    selected = subtitleOptions.none { it.selected },
+                    focusRequester = firstFocusRequester,
+                    onClick = { onSubtitleSelected(null) },
                 )
+                subtitleOptions.forEach { option ->
+                    TrackSelectionRow(
+                        label = option.label,
+                        selected = option.selected,
+                        onClick = { onSubtitleSelected(option) },
+                    )
+                }
             }
 
             if (audioOptions.isNotEmpty()) {
-                TrackSectionTitle("Audio tracks")
-                audioOptions.forEach { option ->
-                    TrackSelectionRow(
-                        label = audioDrawerLabel(option, originalAudioOption),
-                        selected = option.selected,
-                        onClick = { onAudioSelected(option) },
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TrackSectionTitle("Audio")
+                    audioOptions.forEach { option ->
+                        TrackSelectionRow(
+                            label = audioDrawerLabel(option, originalAudioOption),
+                            selected = option.selected,
+                            onClick = { onAudioSelected(option) },
+                        )
+                    }
                 }
             }
         }
@@ -891,8 +959,9 @@ private fun TrackSectionTitle(label: String) {
     Text(
         text = label,
         color = Color.White,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Black,
+        fontSize = 18.sp,
+        lineHeight = 22.sp,
+        fontWeight = FontWeight.Bold,
     )
 }
 
@@ -904,10 +973,11 @@ private fun TrackSelectionRow(
     focusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val contentColor = if (focused) Color.Black else Color.White
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(40.dp)
             .clip(RoundedCornerShape(50.dp))
             .background(if (focused) Color(0xFFE8EEFF) else Color.Transparent)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
@@ -922,25 +992,26 @@ private fun TrackSelectionRow(
             }
             .focusable()
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(18.dp), contentAlignment = Alignment.Center) {
             if (selected) {
                 Icon(
                     Icons.Rounded.Check,
                     contentDescription = null,
-                    tint = if (focused) Color.Black else Color.White,
-                    modifier = Modifier.size(20.dp),
+                    tint = contentColor,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
         Text(
             text = label,
-            color = if (focused) Color.Black else Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            color = contentColor,
+            fontSize = 16.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -993,13 +1064,16 @@ private fun PlaybackProgressBar(
 
 @Composable
 private fun TopPlayerAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
+    icon: ImageVector,
+    contentDescription: String,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    Column(
+    Box(
         modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(50.dp))
+            .background(if (focused) Color.White else Color.Transparent)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -1011,28 +1085,13 @@ private fun TopPlayerAction(
             }
             .focusable()
             .clickable(role = Role.Button, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(50.dp))
-                .background(if (focused) Color.White else Color.Transparent),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = if (focused) Color.Black else Color.White,
-                modifier = Modifier.size(34.dp),
-            )
-        }
-        Text(
-            label,
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Black,
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = if (focused) Color.Black else Color.White,
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -1079,9 +1138,14 @@ private fun LargeRoundPlayButton(
 
     Box(
         modifier = Modifier
-            .size(82.dp)
+            .size(56.dp)
             .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
-            .clip(RoundedCornerShape(82.dp))
+            .clip(RoundedCornerShape(56.dp))
+            .border(
+                width = 1.5.dp,
+                color = if (focused) Color.Transparent else Color(0x99FFFFFF),
+                shape = RoundedCornerShape(56.dp),
+            )
             .background(if (focused) Color.White else Color.Transparent)
             .onFocusChanged {
                 focused = it.isFocused
@@ -1120,7 +1184,7 @@ private fun LargeRoundPlayButton(
             imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
             contentDescription = null,
             tint = if (focused) Color.Black else Color.White,
-            modifier = Modifier.size(52.dp),
+            modifier = Modifier.size(32.dp),
         )
     }
 }
@@ -1132,10 +1196,12 @@ private fun PlayerPill(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val contentColor = if (focused) Color.Black else PlayerControlPillContentColor
     Row(
         modifier = Modifier
+            .height(34.dp)
             .clip(RoundedCornerShape(50.dp))
-            .background(if (focused) Color.White else Color.Transparent)
+            .background(if (focused) PlayerControlPillFocusedColor else PlayerControlPillColor)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -1147,38 +1213,44 @@ private fun PlayerPill(
             }
             .focusable()
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         if (checked) {
             Icon(
                 Icons.Rounded.Check,
                 contentDescription = null,
-                tint = if (focused) Color.Black else Color.White,
-                modifier = Modifier.size(20.dp),
+                tint = contentColor,
+                modifier = Modifier.size(17.dp),
             )
         }
         Text(
-            label,
-            color = if (focused) Color.Black else Color.White,
-            style = MaterialTheme.typography.bodyLarge,
+            text = label,
+            modifier = Modifier.widthIn(max = 280.dp),
+            color = contentColor,
+            fontSize = 14.sp,
+            lineHeight = 16.sp,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun SmallCircleControl(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun PlayerIconPill(
+    icon: ImageVector,
+    contentDescription: String,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val contentColor = if (focused) Color.Black else PlayerControlPillContentColor
     Box(
         modifier = Modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(44.dp))
-            .background(if (focused) Color.White else Color.Transparent)
+            .size(34.dp)
+            .clip(RoundedCornerShape(50.dp))
+            .background(if (focused) PlayerControlPillFocusedColor else PlayerControlPillColor)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.key in TvSelectKeys) {
@@ -1192,7 +1264,12 @@ private fun SmallCircleControl(
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(24.dp))
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = contentColor,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
