@@ -24,6 +24,15 @@ import okhttp3.Response
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 
+private val XmlTvDateFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z", Locale.US)
+private val FlexibleTimeFormatters = listOf(
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
+)
+private val XmlTvParserFactory: XmlPullParserFactory by lazy {
+    XmlPullParserFactory.newInstance()
+}
+
 class XtreamApi(
     private val client: OkHttpClient,
 ) {
@@ -581,12 +590,13 @@ class XtreamApi(
         windowHours: Int,
         onChunk: suspend (List<EpgProgramPayload>) -> Unit,
     ) {
-        val parser = XmlPullParserFactory.newInstance().newPullParser().apply {
+        val parser = XmlTvParserFactory.newPullParser().apply {
             setInput(inputStream, null)
         }
 
-        val lowerBound = System.currentTimeMillis() - 4 * 60 * 60 * 1000L
-        val upperBound = System.currentTimeMillis() + windowHours.coerceIn(12, 96) * 60L * 60L * 1000L
+        val now = System.currentTimeMillis()
+        val lowerBound = now
+        val upperBound = now + windowHours.coerceIn(12, 96) * 60L * 60L * 1000L
 
         var eventType = parser.eventType
         val chunk = ArrayList<EpgProgramPayload>(500)
@@ -818,7 +828,7 @@ class XtreamApi(
         return try {
             ZonedDateTime.parse(
                 "$datePart $offsetPart",
-                DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z", Locale.US),
+                XmlTvDateFormatter,
             ).toInstant().toEpochMilli()
         } catch (_: DateTimeParseException) {
             null
@@ -833,11 +843,7 @@ class XtreamApi(
             return if (raw.length <= 10) numeric * 1000 else numeric
         }
 
-        val patterns = listOf(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-        )
-        patterns.forEach { formatter ->
+        FlexibleTimeFormatters.forEach { formatter ->
             try {
                 return LocalDateTime.parse(raw, formatter)
                     .atZone(ZoneId.systemDefault())

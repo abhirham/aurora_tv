@@ -2,8 +2,8 @@
 .gradle/
 .kotlin/
 build/
+**/build/
 out/
-netlflix
 
 # Android Studio and IntelliJ local files
 .idea/
@@ -24,6 +24,15 @@ captures/
 .externalNativeBuild/
 .cxx/
 
+# Benchmark, profiling, and compiler-report artifacts
+*.hprof
+*.trace
+*.perfetto-trace
+*.prof
+*.profm
+baseline-prof.txt
+startup-prof.txt
+
 # Signing keys and release secrets
 *.jks
 *.keystore
@@ -43,6 +52,7 @@ signing.properties
 # Local diagnostics captures
 diagnostics/*.pid
 diagnostics/repro-markers.txt
+netlflix/
 
 # OS and editor noise
 .DS_Store

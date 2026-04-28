@@ -1,0 +1,33 @@
+name: Compose Reports
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  compose-reports:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release with Compose reports
+        run: ./gradlew :app:assembleRelease -PenableComposeCompilerReports=true
+
+      - name: Upload Compose compiler reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-compiler-reports
+          path: app/build/compose_compiler
+          if-no-files-found: error

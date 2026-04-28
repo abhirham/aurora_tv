@@ -3,6 +3,7 @@ package com.codexlabs.auroratv.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.codexlabs.auroratv.BuildConfig
 import com.codexlabs.auroratv.app.AuroraTvApplication
 import com.codexlabs.auroratv.data.AppSettings
 import com.codexlabs.auroratv.data.BufferProfile
@@ -22,6 +23,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -62,30 +66,40 @@ class MainViewModel(
     private val _searchResults = MutableStateFlow(SearchResults())
     val searchResults: StateFlow<SearchResults> = _searchResults.asStateFlow()
 
+    private val _settingsLoaded = MutableStateFlow(false)
+    val settingsLoaded: StateFlow<Boolean> = _settingsLoaded.asStateFlow()
+
     private var searchJob: Job? = null
 
     init {
         viewModelScope.launch {
-            settings.collect { appSettings ->
-                if (appSettings.isConfigured && appSettings.autoSyncEnabled) {
+            repository.settings.first()
+            _settingsLoaded.value = true
+        }
+
+        viewModelScope.launch {
+            settings
+                .map { it.isConfigured && it.autoSyncEnabled }
+                .distinctUntilChanged()
+                .collect { autoSyncReady ->
+                    if (!autoSyncReady) return@collect
                     SyncWorker.schedulePeriodic(getApplication())
-                    maybeRefreshOnLaunch(appSettings)
+                    maybeRefreshOnLaunch(settings.value)
                 }
-            }
         }
     }
 
     fun observeCategories(section: LibrarySection, includeAdult: Boolean) =
         repository.observeCategories(section, includeAdult)
 
-    fun observeChannels(categoryId: String?, includeAdult: Boolean) =
-        repository.observeChannels(categoryId, includeAdult)
+    fun observeChannels(categoryId: String?, includeAdult: Boolean, limit: Int) =
+        repository.observeChannels(categoryId, includeAdult, limit)
 
-    fun observeMovies(categoryId: String?, includeAdult: Boolean) =
-        repository.observeMovies(categoryId, includeAdult)
+    fun observeMovies(categoryId: String?, includeAdult: Boolean, limit: Int) =
+        repository.observeMovies(categoryId, includeAdult, limit)
 
-    fun observeSeries(categoryId: String?, includeAdult: Boolean) =
-        repository.observeSeries(categoryId, includeAdult)
+    fun observeSeries(categoryId: String?, includeAdult: Boolean, limit: Int) =
+        repository.observeSeries(categoryId, includeAdult, limit)
 
     fun observeEpisodes(seriesId: Long) =
         repository.observeEpisodes(seriesId)
@@ -109,6 +123,23 @@ class MainViewModel(
                 _syncMessage.value = "Library sync completed"
             }.onFailure { throwable ->
                 _syncMessage.value = throwable.message ?: "Library sync failed"
+            }
+            _isSyncing.value = false
+        }
+    }
+
+    fun seedDebugCatalog() {
+        if (!BuildConfig.DEBUG || _isSyncing.value) return
+        viewModelScope.launch {
+            _isSyncing.value = true
+            runCatching {
+                repository.seedDebugCatalog { status ->
+                    _syncMessage.value = status
+                }
+            }.onSuccess {
+                _syncMessage.value = "Debug catalog seeded"
+            }.onFailure { throwable ->
+                _syncMessage.value = throwable.message ?: "Debug seed failed"
             }
             _isSyncing.value = false
         }
@@ -186,13 +217,17 @@ class MainViewModel(
 
     fun ensureSeriesLoaded(seriesId: Long) {
         viewModelScope.launch {
-            repository.ensureSeriesLoaded(seriesId)
+            runCatching {
+                repository.ensureSeriesLoaded(seriesId)
+            }
         }
     }
 
     fun ensureGuide(streamId: Long) {
         viewModelScope.launch {
-            repository.ensureGuide(streamId)
+            runCatching {
+                repository.ensureGuide(streamId)
+            }
         }
     }
 

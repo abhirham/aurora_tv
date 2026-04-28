@@ -64,8 +64,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,17 +98,22 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import com.codexlabs.auroratv.BuildConfig
+import com.codexlabs.auroratv.app.AuroraTvApplication
 import com.codexlabs.auroratv.data.AppSettings
 import com.codexlabs.auroratv.data.BufferProfile
 import com.codexlabs.auroratv.data.CategoryEntity
-import com.codexlabs.auroratv.data.ChannelEntity
+import com.codexlabs.auroratv.data.ChannelListItem
 import com.codexlabs.auroratv.data.EpgEventEntity
 import com.codexlabs.auroratv.data.EpisodeEntity
 import com.codexlabs.auroratv.data.LibrarySection
 import com.codexlabs.auroratv.data.MovieEntity
+import com.codexlabs.auroratv.data.MovieListItem
 import com.codexlabs.auroratv.data.PreferredPlayer
 import com.codexlabs.auroratv.data.SearchResultItem
 import com.codexlabs.auroratv.data.SeriesEntity
+import com.codexlabs.auroratv.data.SeriesListItem
 import com.codexlabs.auroratv.data.TargetType
 import com.codexlabs.auroratv.player.PlayerActivity
 import java.text.SimpleDateFormat
@@ -114,6 +122,7 @@ import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
@@ -124,6 +133,22 @@ private val NetflixRed = Color(0xFFE50914)
 private val GuideGreen = Color(0xFF2CE88D)
 private val SoftLine = Color(0xFF2A2A2A)
 private val MutedText = Color(0xFFB8B8B8)
+private val ArtworkPlaceholderBrush = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFF2A2A2A),
+        Color(0xFF090909),
+    ),
+)
+private val EpgClockFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("h:mm a", Locale.getDefault())
+}
+private const val LiveBrowseInitialWindowSize = 80
+private const val LibraryBrowseInitialWindowSize = 72
+private const val BrowseWindowPageSize = 72
+private const val MaxBrowseWindowSize = 600
+private const val BrowseLoadMoreThreshold = 12
+private const val ArtworkRequestWidthPx = 420
+private const val ArtworkRequestHeightPx = 630
 private val TvSelectKeys = setOf(
     Key.DirectionCenter,
     Key.Enter,
@@ -150,6 +175,11 @@ private fun Modifier.dpadFocusRoute(
     }
 }
 
+private suspend fun FocusRequester.requestFocusAfterComposition() {
+    withFrameNanos { }
+    runCatching { requestFocus() }
+}
+
 private enum class FocusTreatment {
     Filled,
     Outline,
@@ -160,6 +190,7 @@ fun AuroraTvApp(
     viewModel: MainViewModel = viewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val settingsLoaded by viewModel.settingsLoaded.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
@@ -170,12 +201,6 @@ fun AuroraTvApp(
     val scope = rememberCoroutineScope()
     val topActiveTabFocusRequester = remember { FocusRequester() }
     val activeCategoryFocusRequester = remember { FocusRequester() }
-
-    if (settings.isConfigured) {
-        LaunchedEffect(settings.isConfigured) {
-            viewModel.syncAll(force = false)
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -190,7 +215,9 @@ fun AuroraTvApp(
                 ),
             ),
     ) {
-        if (!settings.isConfigured) {
+        if (!settingsLoaded) {
+            LoadingState(message = "Loading Aurora TV")
+        } else if (!settings.isConfigured) {
             SetupScreen(
                 settings = settings,
                 onSave = viewModel::saveProvider,
@@ -295,6 +322,7 @@ fun AuroraTvApp(
                         onBufferProfileChanged = viewModel::setBufferProfile,
                         onEpgWindowChanged = viewModel::setEpgWindowHours,
                         onPinChanged = viewModel::setParentalPin,
+                        onSeedDebugCatalog = viewModel::seedDebugCatalog,
                     )
                 }
             }
@@ -364,8 +392,7 @@ private fun StreamingTopNav(
     )
     val downTarget = if (selected in sectionsWithCategoryBar) activeCategoryFocusRequester else null
     LaunchedEffect(selected) {
-        delay(50)
-        runCatching { activeTabFocusRequester.requestFocus() }
+        activeTabFocusRequester.requestFocusAfterComposition()
     }
 
     Row(
@@ -393,11 +420,6 @@ private fun StreamingTopNav(
             ) {
                 Text("A", color = Color.White, fontWeight = FontWeight.Black)
             }
-            Box(
-                modifier = Modifier
-                    .width(0.dp)
-                    .height(0.dp),
-            )
         }
 
         Row(
@@ -567,8 +589,7 @@ private fun SetupScreen(
     val setupActionFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        delay(50)
-        setupActionFocusRequester.requestFocus()
+        setupActionFocusRequester.requestFocusAfterComposition()
     }
 
     Box(
@@ -665,56 +686,66 @@ private fun HomeScreen(
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val stats by viewModel.libraryStats.collectAsStateWithLifecycle()
 
-    val continueCards = continueWatching.map {
-        StripCard(
-            id = it.targetId,
-            title = it.title,
-            subtitle = it.subtitle ?: progressLabel(it.positionMs, it.durationMs),
-            artworkUrl = it.artworkUrl,
-            targetType = TargetType.from(it.targetType),
-            categoryId = null,
-            resumePositionMs = it.positionMs,
-        )
+    val continueCards = remember(continueWatching) {
+        continueWatching.map {
+            StripCard(
+                id = it.targetId,
+                title = it.title,
+                subtitle = it.subtitle ?: progressLabel(it.positionMs, it.durationMs),
+                artworkUrl = it.artworkUrl,
+                targetType = TargetType.from(it.targetType),
+                categoryId = null,
+                resumePositionMs = it.positionMs,
+            )
+        }
     }
-    val favoriteMovieCards = favoriteMovies.map {
-        StripCard(
-            id = it.targetId,
-            title = it.title,
-            subtitle = it.subtitle,
-            artworkUrl = it.artworkUrl,
-            targetType = TargetType.from(it.targetType),
-            categoryId = null,
-        )
+    val favoriteMovieCards = remember(favoriteMovies) {
+        favoriteMovies.map {
+            StripCard(
+                id = it.targetId,
+                title = it.title,
+                subtitle = it.subtitle,
+                artworkUrl = it.artworkUrl,
+                targetType = TargetType.from(it.targetType),
+                categoryId = null,
+            )
+        }
     }
-    val favoriteSeriesCards = favoriteSeries.map {
-        StripCard(
-            id = it.targetId,
-            title = it.title,
-            subtitle = it.subtitle,
-            artworkUrl = it.artworkUrl,
-            targetType = TargetType.from(it.targetType),
-            categoryId = null,
-        )
+    val favoriteSeriesCards = remember(favoriteSeries) {
+        favoriteSeries.map {
+            StripCard(
+                id = it.targetId,
+                title = it.title,
+                subtitle = it.subtitle,
+                artworkUrl = it.artworkUrl,
+                targetType = TargetType.from(it.targetType),
+                categoryId = null,
+            )
+        }
     }
-    val recentChannelCards = recentChannels.map {
-        StripCard(
-            id = it.channelId.toString(),
-            title = it.title,
-            subtitle = "Live TV",
-            artworkUrl = it.artworkUrl,
-            targetType = TargetType.CHANNEL,
-            categoryId = it.categoryId,
-        )
+    val recentChannelCards = remember(recentChannels) {
+        recentChannels.map {
+            StripCard(
+                id = it.channelId.toString(),
+                title = it.title,
+                subtitle = "Live TV",
+                artworkUrl = it.artworkUrl,
+                targetType = TargetType.CHANNEL,
+                categoryId = it.categoryId,
+            )
+        }
     }
-    val favoriteChannelCards = favoriteChannels.map {
-        StripCard(
-            id = it.targetId,
-            title = it.title,
-            subtitle = it.subtitle,
-            artworkUrl = it.artworkUrl,
-            targetType = TargetType.from(it.targetType),
-            categoryId = null,
-        )
+    val favoriteChannelCards = remember(favoriteChannels) {
+        favoriteChannels.map {
+            StripCard(
+                id = it.targetId,
+                title = it.title,
+                subtitle = it.subtitle,
+                artworkUrl = it.artworkUrl,
+                targetType = TargetType.from(it.targetType),
+                categoryId = null,
+            )
+        }
     }
     val primaryCards = remember(
         continueCards,
@@ -760,7 +791,9 @@ private fun HomeScreen(
                     rating = null,
                     releaseYear = item.subtitle,
                     isAdult = false,
+                    categoryHidden = false,
                     addedAt = null,
+                    syncToken = 0L,
                 ),
             )
         }
@@ -1227,7 +1260,7 @@ private fun LiveTvScreen(
     viewModel: MainViewModel,
     topActiveTabFocusRequester: FocusRequester,
     activeCategoryFocusRequester: FocusRequester,
-    onPlayChannel: (ChannelEntity, String?) -> Unit,
+    onPlayChannel: (ChannelListItem, String?) -> Unit,
 ) {
     val categories by viewModel.observeCategories(LibrarySection.LIVE, settings.adultContentEnabled)
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -1243,7 +1276,14 @@ private fun LiveTvScreen(
         }
     }
 
-    val channels by viewModel.observeChannels(selectedCategoryId, settings.adultContentEnabled)
+    var channelWindowSize by rememberSaveable(selectedCategoryId, settings.adultContentEnabled) {
+        mutableStateOf(LiveBrowseInitialWindowSize)
+    }
+    val channels by viewModel.observeChannels(
+        selectedCategoryId,
+        settings.adultContentEnabled,
+        channelWindowSize,
+    )
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val channelById = remember(channels) { channels.associateBy { it.streamId } }
 
@@ -1257,12 +1297,14 @@ private fun LiveTvScreen(
 
     val highlightedChannel = focusedChannelId?.let(channelById::get) ?: channels.firstOrNull()
 
+    var guideChannelId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(highlightedChannel?.streamId) {
-        delay(250)
-        highlightedChannel?.streamId?.let(viewModel::ensureGuide)
+        delay(150)
+        guideChannelId = highlightedChannel?.streamId
+        guideChannelId?.let(viewModel::ensureGuide)
     }
-    val guideFlow: Flow<List<EpgEventEntity>> = remember(highlightedChannel?.streamId) {
-        highlightedChannel?.streamId?.let(viewModel::observeGuide) ?: flowOf(emptyList())
+    val guideFlow: Flow<List<EpgEventEntity>> = remember(guideChannelId) {
+        guideChannelId?.let(viewModel::observeGuide) ?: flowOf(emptyList())
     }
     val guide by guideFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val liveRailFocusRequester = remember { FocusRequester() }
@@ -1314,6 +1356,11 @@ private fun LiveTvScreen(
                 heroFocusRequester = liveHeroPlayFocusRequester,
                 initialFocusRequester = liveGuideFocusRequester,
                 isLoading = isSyncing && channels.isEmpty(),
+                canLoadMore = channels.size >= channelWindowSize,
+                onLoadMore = {
+                    channelWindowSize = (channelWindowSize + BrowseWindowPageSize)
+                        .coerceAtMost(MaxBrowseWindowSize)
+                },
                 onChannelFocused = { focusedChannelId = it.streamId },
                 onPlayChannel = { onPlayChannel(it, selectedCategoryId) },
             )
@@ -1336,8 +1383,8 @@ private fun LiveCategoryRail(
     val listState = rememberLazyListState()
     val selectedIndex = categories.indexOfFirst { it.remoteId == selectedCategoryId }
 
-    LaunchedEffect(selectedIndex, categories.size) {
-        if (selectedIndex >= 0) {
+    LaunchedEffect(selectedCategoryId) {
+        if (selectedIndex >= 0 && !listState.isScrollInProgress) {
             listState.scrollToItem(selectedIndex)
         }
     }
@@ -1474,7 +1521,7 @@ private fun LiveRailItem(
 @Composable
 private fun LiveHero(
     modifier: Modifier,
-    channel: ChannelEntity?,
+    channel: ChannelListItem?,
     guide: List<EpgEventEntity>,
     playFocusRequester: FocusRequester,
     onPlay: () -> Unit,
@@ -1614,18 +1661,34 @@ private fun LiveHero(
 @Composable
 private fun LiveEpgGrid(
     modifier: Modifier,
-    channels: List<ChannelEntity>,
-    highlightedChannel: ChannelEntity?,
+    channels: List<ChannelListItem>,
+    highlightedChannel: ChannelListItem?,
     guide: List<EpgEventEntity>,
     railFocusRequester: FocusRequester,
     heroFocusRequester: FocusRequester,
     initialFocusRequester: FocusRequester,
     isLoading: Boolean = false,
-    onChannelFocused: (ChannelEntity) -> Unit,
-    onPlayChannel: (ChannelEntity) -> Unit,
+    canLoadMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
+    onChannelFocused: (ChannelListItem) -> Unit,
+    onPlayChannel: (ChannelListItem) -> Unit,
 ) {
     val now = System.currentTimeMillis()
     val rows = remember(channels) { channels }
+    val listState = rememberLazyListState()
+    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
+
+    LaunchedEffect(listState, rows.size, canLoadMore) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisibleIndex to layoutInfo.totalItemsCount
+        }.collect { (lastVisibleIndex, totalItems) ->
+            if (canLoadMore && totalItems > 0 && lastVisibleIndex >= totalItems - BrowseLoadMoreThreshold) {
+                currentOnLoadMore()
+            }
+        }
+    }
 
     Column(modifier = modifier) {
         Row(
@@ -1646,6 +1709,7 @@ private fun LiveEpgGrid(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .focusRestorer()
                     .focusGroup(),
@@ -1754,7 +1818,14 @@ private fun MovieScreen(
         }
     }
 
-    val movies by viewModel.observeMovies(selectedCategoryId, settings.adultContentEnabled)
+    var movieWindowSize by rememberSaveable(selectedCategoryId, settings.adultContentEnabled) {
+        mutableStateOf(LibraryBrowseInitialWindowSize)
+    }
+    val movies by viewModel.observeMovies(
+        selectedCategoryId,
+        settings.adultContentEnabled,
+        movieWindowSize,
+    )
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
@@ -1768,12 +1839,17 @@ private fun MovieScreen(
         emptyMessage = "No movies available in this group",
         isLoading = isSyncing && (categories.isEmpty() || movies.isEmpty()),
         loadingMessage = "Loading movies...",
+        canLoadMore = movies.size >= movieWindowSize,
+        onLoadMore = {
+            movieWindowSize = (movieWindowSize + BrowseWindowPageSize)
+                .coerceAtMost(MaxBrowseWindowSize)
+        },
     ) {
         items(movies, key = { it.streamId }) { movie ->
             PosterTile(
                 title = movie.name,
                 artworkUrl = movie.artworkUrl,
-                onClick = { onOpenMovie(movie) },
+                onClick = { onOpenMovie(movie.toMovieEntity()) },
             )
         }
     }
@@ -1799,7 +1875,14 @@ private fun SeriesScreen(
         }
     }
 
-    val seriesItems by viewModel.observeSeries(selectedCategoryId, settings.adultContentEnabled)
+    var seriesWindowSize by rememberSaveable(selectedCategoryId, settings.adultContentEnabled) {
+        mutableStateOf(LibraryBrowseInitialWindowSize)
+    }
+    val seriesItems by viewModel.observeSeries(
+        selectedCategoryId,
+        settings.adultContentEnabled,
+        seriesWindowSize,
+    )
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
@@ -1813,12 +1896,17 @@ private fun SeriesScreen(
         emptyMessage = "No series available in this group",
         isLoading = isSyncing && (categories.isEmpty() || seriesItems.isEmpty()),
         loadingMessage = "Loading series...",
+        canLoadMore = seriesItems.size >= seriesWindowSize,
+        onLoadMore = {
+            seriesWindowSize = (seriesWindowSize + BrowseWindowPageSize)
+                .coerceAtMost(MaxBrowseWindowSize)
+        },
     ) {
         items(seriesItems, key = { it.seriesId }) { series ->
             PosterTile(
                 title = series.name,
                 artworkUrl = series.artworkUrl,
-                onClick = { onOpenSeries(series) },
+                onClick = { onOpenSeries(series.toSeriesEntity()) },
             )
         }
     }
@@ -1836,15 +1924,30 @@ private fun LibraryGridLayout(
     emptyMessage: String,
     isLoading: Boolean = false,
     loadingMessage: String = "Loading...",
+    canLoadMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
     content: LazyGridScope.() -> Unit,
 ) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
     val selectedIndex = categories.indexOfFirst { it.remoteId == selectedCategoryId }
         .takeIf { it >= 0 }
 
     LaunchedEffect(selectedCategoryId) {
         gridState.scrollToItem(0)
+    }
+
+    LaunchedEffect(gridState, canLoadMore, isEmpty) {
+        snapshotFlow {
+            val layoutInfo = gridState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisibleIndex to layoutInfo.totalItemsCount
+        }.collect { (lastVisibleIndex, totalItems) ->
+            if (!isEmpty && canLoadMore && totalItems > 0 && lastVisibleIndex >= totalItems - BrowseLoadMoreThreshold) {
+                currentOnLoadMore()
+            }
+        }
     }
 
     Row(
@@ -2036,7 +2139,9 @@ private fun SearchScreen(
                             containerExtension = null,
                             directSource = null,
                             isAdult = settings.adultContentEnabled,
+                            categoryHidden = false,
                             addedAt = null,
+                            syncToken = 0L,
                         ),
                     )
                 },
@@ -2057,7 +2162,9 @@ private fun SearchScreen(
                             rating = null,
                             releaseYear = item.subtitle,
                             isAdult = settings.adultContentEnabled,
+                            categoryHidden = false,
                             addedAt = null,
+                            syncToken = 0L,
                         ),
                     )
                 },
@@ -2141,12 +2248,17 @@ private fun SettingsScreen(
     onBufferProfileChanged: (BufferProfile) -> Unit,
     onEpgWindowChanged: (Int) -> Unit,
     onPinChanged: (String) -> Unit,
+    onSeedDebugCatalog: () -> Unit,
 ) {
     var baseUrl by rememberSaveable { mutableStateOf(settings.providerBaseUrl) }
     var username by rememberSaveable { mutableStateOf(settings.providerUsername) }
     var password by rememberSaveable { mutableStateOf(settings.providerPassword) }
-    var epgHours by rememberSaveable { mutableStateOf(settings.epgWindowHours.toString()) }
-    var pin by rememberSaveable { mutableStateOf(settings.parentalPin) }
+    var epgHours by rememberSaveable(settings.epgWindowHours) {
+        mutableStateOf(settings.epgWindowHours.toString())
+    }
+    var pin by rememberSaveable(settings.parentalPin) {
+        mutableStateOf(settings.parentalPin)
+    }
     val baseUrlFocusRequester = remember { FocusRequester() }
     val usernameFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
@@ -2160,8 +2272,22 @@ private fun SettingsScreen(
     val refreshFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        delay(90)
-        connectFocusRequester.requestFocus()
+        connectFocusRequester.requestFocusAfterComposition()
+    }
+
+    LaunchedEffect(epgHours, settings.epgWindowHours) {
+        delay(500)
+        val hours = epgHours.toIntOrNull() ?: return@LaunchedEffect
+        if (hours != settings.epgWindowHours) {
+            onEpgWindowChanged(hours)
+        }
+    }
+
+    LaunchedEffect(pin, settings.parentalPin) {
+        delay(500)
+        if (pin != settings.parentalPin) {
+            onPinChanged(pin)
+        }
     }
 
     Surface(
@@ -2283,7 +2409,6 @@ private fun SettingsScreen(
                 value = epgHours,
                 onValueChange = {
                     epgHours = it.filter(Char::isDigit).take(2)
-                    it.toIntOrNull()?.let(onEpgWindowChanged)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2299,7 +2424,6 @@ private fun SettingsScreen(
                 value = pin,
                 onValueChange = {
                     pin = it.filter(Char::isDigit).take(4)
-                    onPinChanged(pin)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2383,6 +2507,17 @@ private fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(if (isSyncing) "Syncing..." else "Refresh Library Now")
+            }
+            if (BuildConfig.DEBUG) {
+                TvActionButton(
+                    onClick = onSeedDebugCatalog,
+                    enabled = !isSyncing,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Icon(Icons.Rounded.GridView, contentDescription = null)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Seed Debug Catalog")
+                }
             }
             }
         }
@@ -2510,8 +2645,7 @@ private fun MovieDialog(
     val playFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(movie.streamId) {
-        delay(50)
-        playFocusRequester.requestFocus()
+        playFocusRequester.requestFocusAfterComposition()
     }
 
     Dialog(
@@ -2607,8 +2741,7 @@ private fun SeriesDialog(
             selectedSeason = seasons.keys.firstOrNull() ?: 1
         }
         if (seasons.isNotEmpty()) {
-            delay(50)
-            activeSeasonFocusRequester.requestFocus()
+            activeSeasonFocusRequester.requestFocusAfterComposition()
         }
     }
     val selectedEpisodes = seasons[selectedSeason].orEmpty()
@@ -2941,17 +3074,21 @@ private fun Artwork(
     shape: RoundedCornerShape,
     contentScale: ContentScale = ContentScale.Crop,
 ) {
+    val context = LocalContext.current
+    val imageLoader = remember(context) {
+        (context.applicationContext as AuroraTvApplication).container.imageLoader
+    }
+    val imageRequest = remember(context, url) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .size(ArtworkRequestWidthPx, ArtworkRequestHeightPx)
+            .build()
+    }
+
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF2A2A2A),
-                        Color(0xFF090909),
-                    ),
-                ),
-            ),
+            .background(ArtworkPlaceholderBrush),
         contentAlignment = Alignment.Center,
     ) {
         if (url.isNullOrBlank()) {
@@ -2963,8 +3100,9 @@ private fun Artwork(
             )
         } else {
             AsyncImage(
-                model = url,
+                model = imageRequest,
                 contentDescription = null,
+                imageLoader = imageLoader,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
             )
@@ -3027,7 +3165,7 @@ private fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 private fun formatEpgClockRange(event: EpgEventEntity): String {
-    val formatter = SimpleDateFormat("h:mm a", Locale.getDefault())
+    val formatter = checkNotNull(EpgClockFormatter.get())
     return "${formatter.format(Date(event.startEpochMillis))} - ${formatter.format(Date(event.endEpochMillis))}"
 }
 
@@ -3035,6 +3173,40 @@ private fun progressLabel(positionMs: Long, durationMs: Long): String {
     if (durationMs <= 0L) return "Resume"
     val percent = (positionMs.toFloat() / durationMs.toFloat() * 100f).toInt().coerceIn(0, 100)
     return "$percent% watched"
+}
+
+private fun MovieListItem.toMovieEntity(): MovieEntity {
+    return MovieEntity(
+        streamId = streamId,
+        categoryRemoteId = categoryRemoteId,
+        name = name,
+        artworkUrl = artworkUrl,
+        plot = plot,
+        rating = rating,
+        releaseYear = releaseYear,
+        containerExtension = null,
+        directSource = null,
+        isAdult = false,
+        categoryHidden = false,
+        addedAt = null,
+        syncToken = 0L,
+    )
+}
+
+private fun SeriesListItem.toSeriesEntity(): SeriesEntity {
+    return SeriesEntity(
+        seriesId = seriesId,
+        categoryRemoteId = categoryRemoteId,
+        name = name,
+        artworkUrl = artworkUrl,
+        plot = plot,
+        rating = rating,
+        releaseYear = releaseYear,
+        isAdult = false,
+        categoryHidden = false,
+        addedAt = null,
+        syncToken = 0L,
+    )
 }
 
 private fun homeMetadata(item: StripCard): String {
@@ -3068,43 +3240,35 @@ private fun launchPlayback(
     resumePositionMs: Long? = null,
 ) {
     scope.launch {
-        val descriptor = viewModel.resolvePlayback(targetType, targetId, categoryId)
-
-        if (descriptor.isLive) {
-            viewModel.registerRecentChannel(
-                channelId = descriptor.targetId.toLong(),
-                title = descriptor.title,
-                artworkUrl = descriptor.artworkUrl,
-                categoryId = descriptor.categoryId,
-            )
-        }
-
-        val launchedExternal = if (settings.preferredPlayer == PreferredPlayer.EXTERNAL) {
+        if (settings.preferredPlayer == PreferredPlayer.EXTERNAL) {
+            val descriptor = viewModel.resolvePlayback(targetType, targetId, categoryId)
             val externalIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(Uri.parse(descriptor.mediaUrl), "video/*")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             if (externalIntent.resolveActivity(context.packageManager) != null) {
+                if (descriptor.isLive) {
+                    viewModel.registerRecentChannel(
+                        channelId = descriptor.targetId.toLong(),
+                        title = descriptor.title,
+                        artworkUrl = descriptor.artworkUrl,
+                        categoryId = descriptor.categoryId,
+                    )
+                }
                 context.startActivity(externalIntent)
-                true
-            } else {
-                false
+                return@launch
             }
-        } else {
-            false
         }
 
-        if (!launchedExternal) {
-            context.startActivity(
-                PlayerActivity.createIntent(
-                    context = context,
-                    targetType = descriptor.targetType,
-                    targetId = descriptor.targetId,
-                    categoryId = descriptor.categoryId,
-                    resumePositionMs = resumePositionMs,
-                ),
-            )
-        }
+        context.startActivity(
+            PlayerActivity.createIntent(
+                context = context,
+                targetType = targetType,
+                targetId = targetId,
+                categoryId = categoryId,
+                resumePositionMs = resumePositionMs,
+            ),
+        )
     }
 }
 

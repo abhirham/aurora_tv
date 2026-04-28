@@ -4,18 +4,27 @@ import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.RewriteQueriesToDropUnusedColumns
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.codexlabs.auroratv.BuildConfig
 import kotlinx.coroutines.flow.Flow
 
 @Entity(
     tableName = "categories",
     primaryKeys = ["section", "remoteId"],
+    indices = [
+        Index(value = ["section", "hidden", "isAdult", "sortOrder", "name"]),
+        Index("syncToken"),
+    ],
 )
 data class CategoryEntity(
     val section: String,
@@ -24,6 +33,7 @@ data class CategoryEntity(
     val isAdult: Boolean,
     val hidden: Boolean,
     val sortOrder: Int,
+    val syncToken: Long,
 )
 
 @Entity(
@@ -31,6 +41,8 @@ data class CategoryEntity(
     indices = [
         Index("categoryRemoteId"),
         Index("epgChannelId"),
+        Index(value = ["categoryRemoteId", "categoryHidden", "isAdult", "channelNumber", "name", "streamId"]),
+        Index("syncToken"),
     ],
 )
 data class ChannelEntity(
@@ -44,14 +56,29 @@ data class ChannelEntity(
     val directSource: String?,
     val customSid: String?,
     val isAdult: Boolean,
+    val categoryHidden: Boolean,
     val hasCatchup: Boolean,
     val catchupDurationHours: Int,
     val addedAt: Long?,
+    val syncToken: Long,
+)
+
+@Fts4(tokenizer = "unicode61")
+@Entity(tableName = "channel_search")
+data class ChannelSearchEntity(
+    @PrimaryKey
+    @androidx.room.ColumnInfo(name = "rowid")
+    val rowId: Long,
+    val name: String,
 )
 
 @Entity(
     tableName = "movies",
-    indices = [Index("categoryRemoteId")],
+    indices = [
+        Index("categoryRemoteId"),
+        Index(value = ["categoryRemoteId", "categoryHidden", "isAdult", "name", "streamId"]),
+        Index("syncToken"),
+    ],
 )
 data class MovieEntity(
     @PrimaryKey val streamId: Long,
@@ -64,12 +91,27 @@ data class MovieEntity(
     val containerExtension: String?,
     val directSource: String?,
     val isAdult: Boolean,
+    val categoryHidden: Boolean,
     val addedAt: Long?,
+    val syncToken: Long,
+)
+
+@Fts4(tokenizer = "unicode61")
+@Entity(tableName = "movie_search")
+data class MovieSearchEntity(
+    @PrimaryKey
+    @androidx.room.ColumnInfo(name = "rowid")
+    val rowId: Long,
+    val name: String,
 )
 
 @Entity(
     tableName = "series",
-    indices = [Index("categoryRemoteId")],
+    indices = [
+        Index("categoryRemoteId"),
+        Index(value = ["categoryRemoteId", "categoryHidden", "isAdult", "name", "seriesId"]),
+        Index("syncToken"),
+    ],
 )
 data class SeriesEntity(
     @PrimaryKey val seriesId: Long,
@@ -80,12 +122,27 @@ data class SeriesEntity(
     val rating: String?,
     val releaseYear: String?,
     val isAdult: Boolean,
+    val categoryHidden: Boolean,
     val addedAt: Long?,
+    val syncToken: Long,
+)
+
+@Fts4(tokenizer = "unicode61")
+@Entity(tableName = "series_search")
+data class SeriesSearchEntity(
+    @PrimaryKey
+    @androidx.room.ColumnInfo(name = "rowid")
+    val rowId: Long,
+    val name: String,
 )
 
 @Entity(
     tableName = "episodes",
-    indices = [Index("seriesId"), Index("seasonNumber")],
+    indices = [
+        Index("seriesId"),
+        Index("seasonNumber"),
+        Index(value = ["seriesId", "seasonNumber", "episodeNumber", "episodeId"]),
+    ],
 )
 data class EpisodeEntity(
     @PrimaryKey val episodeId: Long,
@@ -104,6 +161,9 @@ data class EpisodeEntity(
 @Entity(
     tableName = "epg_events",
     primaryKeys = ["channelEpgId", "startEpochMillis"],
+    indices = [
+        Index(value = ["channelEpgId", "endEpochMillis", "startEpochMillis"]),
+    ],
 )
 data class EpgEventEntity(
     val channelEpgId: String,
@@ -116,6 +176,9 @@ data class EpgEventEntity(
 @Entity(
     tableName = "favorite_items",
     primaryKeys = ["targetType", "targetId"],
+    indices = [
+        Index(value = ["targetType", "addedAt"]),
+    ],
 )
 data class FavoriteItemEntity(
     val targetType: String,
@@ -126,7 +189,12 @@ data class FavoriteItemEntity(
     val addedAt: Long,
 )
 
-@Entity(tableName = "playback_history")
+@Entity(
+    tableName = "playback_history",
+    indices = [
+        Index("lastPlayedAt"),
+    ],
+)
 data class PlaybackHistoryEntity(
     @PrimaryKey val id: String,
     val targetType: String,
@@ -139,7 +207,13 @@ data class PlaybackHistoryEntity(
     val lastPlayedAt: Long,
 )
 
-@Entity(tableName = "recent_channels")
+@Entity(
+    tableName = "recent_channels",
+    indices = [
+        Index("lastPlayedAt"),
+        Index(value = ["categoryId", "lastPlayedAt"]),
+    ],
+)
 data class RecentChannelEntity(
     @PrimaryKey val channelId: Long,
     val title: String,
@@ -148,7 +222,36 @@ data class RecentChannelEntity(
     val lastPlayedAt: Long,
 )
 
+data class ChannelListItem(
+    val streamId: Long,
+    val categoryRemoteId: String,
+    val name: String,
+    val channelNumber: Int?,
+    val logoUrl: String?,
+)
+
+data class MovieListItem(
+    val streamId: Long,
+    val categoryRemoteId: String,
+    val name: String,
+    val artworkUrl: String?,
+    val plot: String?,
+    val rating: String?,
+    val releaseYear: String?,
+)
+
+data class SeriesListItem(
+    val seriesId: Long,
+    val categoryRemoteId: String,
+    val name: String,
+    val artworkUrl: String?,
+    val plot: String?,
+    val rating: String?,
+    val releaseYear: String?,
+)
+
 @Dao
+@RewriteQueriesToDropUnusedColumns
 interface MediaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCategories(items: List<CategoryEntity>)
@@ -157,10 +260,19 @@ interface MediaDao {
     suspend fun upsertChannels(items: List<ChannelEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertChannelSearch(items: List<ChannelSearchEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMovies(items: List<MovieEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMovieSearch(items: List<MovieSearchEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSeries(items: List<SeriesEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSeriesSearch(items: List<SeriesSearchEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEpisodes(items: List<EpisodeEntity>)
@@ -195,6 +307,27 @@ interface MediaDao {
     @Query("DELETE FROM epg_events")
     suspend fun clearEpg()
 
+    @Query("DELETE FROM categories WHERE section = :section AND syncToken != :syncToken")
+    suspend fun deleteStaleCategories(section: String, syncToken: Long)
+
+    @Query("DELETE FROM channels WHERE syncToken != :syncToken")
+    suspend fun deleteStaleChannels(syncToken: Long)
+
+    @Query("DELETE FROM channel_search WHERE rowid NOT IN (SELECT streamId FROM channels)")
+    suspend fun deleteStaleChannelSearch()
+
+    @Query("DELETE FROM movies WHERE syncToken != :syncToken")
+    suspend fun deleteStaleMovies(syncToken: Long)
+
+    @Query("DELETE FROM movie_search WHERE rowid NOT IN (SELECT streamId FROM movies)")
+    suspend fun deleteStaleMovieSearch()
+
+    @Query("DELETE FROM series WHERE syncToken != :syncToken")
+    suspend fun deleteStaleSeries(syncToken: Long)
+
+    @Query("DELETE FROM series_search WHERE rowid NOT IN (SELECT seriesId FROM series)")
+    suspend fun deleteStaleSeriesSearch()
+
     @Query("DELETE FROM favorite_items WHERE targetType = :targetType AND targetId = :targetId")
     suspend fun deleteFavorite(targetType: String, targetId: String)
 
@@ -206,6 +339,15 @@ interface MediaDao {
 
     @Query("UPDATE categories SET hidden = :hidden WHERE section = :section AND remoteId = :remoteId")
     suspend fun setCategoryHidden(section: String, remoteId: String, hidden: Boolean)
+
+    @Query("UPDATE channels SET categoryHidden = :hidden WHERE categoryRemoteId = :remoteId")
+    suspend fun setChannelCategoryHidden(remoteId: String, hidden: Boolean)
+
+    @Query("UPDATE movies SET categoryHidden = :hidden WHERE categoryRemoteId = :remoteId")
+    suspend fun setMovieCategoryHidden(remoteId: String, hidden: Boolean)
+
+    @Query("UPDATE series SET categoryHidden = :hidden WHERE categoryRemoteId = :remoteId")
+    suspend fun setSeriesCategoryHidden(remoteId: String, hidden: Boolean)
 
     @Query(
         """
@@ -220,45 +362,42 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT * FROM channels
+        SELECT streamId, categoryRemoteId, name, channelNumber, logoUrl FROM channels
         WHERE (:categoryId IS NULL OR categoryRemoteId = :categoryId)
+          AND categoryHidden = 0
           AND (:includeAdult = 1 OR isAdult = 0)
-          AND categoryRemoteId NOT IN (
-              SELECT remoteId FROM categories WHERE section = 'live' AND hidden = 1
-          )
         ORDER BY
             CASE WHEN channelNumber IS NULL THEN 1 ELSE 0 END,
             channelNumber,
             name
+        LIMIT :limit
         """,
     )
-    fun observeChannels(categoryId: String?, includeAdult: Boolean): Flow<List<ChannelEntity>>
+    fun observeChannels(categoryId: String?, includeAdult: Boolean, limit: Int): Flow<List<ChannelListItem>>
 
     @Query(
         """
-        SELECT * FROM movies
+        SELECT streamId, categoryRemoteId, name, artworkUrl, plot, rating, releaseYear FROM movies
         WHERE (:categoryId IS NULL OR categoryRemoteId = :categoryId)
+          AND categoryHidden = 0
           AND (:includeAdult = 1 OR isAdult = 0)
-          AND categoryRemoteId NOT IN (
-              SELECT remoteId FROM categories WHERE section = 'movies' AND hidden = 1
-          )
         ORDER BY name
+        LIMIT :limit
         """,
     )
-    fun observeMovies(categoryId: String?, includeAdult: Boolean): Flow<List<MovieEntity>>
+    fun observeMovies(categoryId: String?, includeAdult: Boolean, limit: Int): Flow<List<MovieListItem>>
 
     @Query(
         """
-        SELECT * FROM series
+        SELECT seriesId, categoryRemoteId, name, artworkUrl, plot, rating, releaseYear FROM series
         WHERE (:categoryId IS NULL OR categoryRemoteId = :categoryId)
+          AND categoryHidden = 0
           AND (:includeAdult = 1 OR isAdult = 0)
-          AND categoryRemoteId NOT IN (
-              SELECT remoteId FROM categories WHERE section = 'series' AND hidden = 1
-          )
         ORDER BY name
+        LIMIT :limit
         """,
     )
-    fun observeSeries(categoryId: String?, includeAdult: Boolean): Flow<List<SeriesEntity>>
+    fun observeSeries(categoryId: String?, includeAdult: Boolean, limit: Int): Flow<List<SeriesListItem>>
 
     @Query("SELECT * FROM episodes WHERE seriesId = :seriesId ORDER BY seasonNumber, episodeNumber, title")
     fun observeEpisodes(seriesId: Long): Flow<List<EpisodeEntity>>
@@ -319,13 +458,12 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT * FROM channels
-        WHERE name LIKE '%' || :query || '%'
-          AND (:includeAdult = 1 OR isAdult = 0)
-          AND categoryRemoteId NOT IN (
-              SELECT remoteId FROM categories WHERE section = 'live' AND hidden = 1
-          )
-        ORDER BY name
+        SELECT channels.* FROM channel_search
+        JOIN channels ON channels.streamId = channel_search.rowid
+        WHERE channel_search MATCH :query
+          AND channels.categoryHidden = 0
+          AND (:includeAdult = 1 OR channels.isAdult = 0)
+        ORDER BY channels.name
         LIMIT :limit
         """,
     )
@@ -333,13 +471,12 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT * FROM movies
-        WHERE name LIKE '%' || :query || '%'
-          AND (:includeAdult = 1 OR isAdult = 0)
-          AND categoryRemoteId NOT IN (
-              SELECT remoteId FROM categories WHERE section = 'movies' AND hidden = 1
-          )
-        ORDER BY name
+        SELECT movies.* FROM movie_search
+        JOIN movies ON movies.streamId = movie_search.rowid
+        WHERE movie_search MATCH :query
+          AND movies.categoryHidden = 0
+          AND (:includeAdult = 1 OR movies.isAdult = 0)
+        ORDER BY movies.name
         LIMIT :limit
         """,
     )
@@ -347,13 +484,12 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT * FROM series
-        WHERE name LIKE '%' || :query || '%'
-          AND (:includeAdult = 1 OR isAdult = 0)
-          AND categoryRemoteId NOT IN (
-              SELECT remoteId FROM categories WHERE section = 'series' AND hidden = 1
-          )
-        ORDER BY name
+        SELECT series.* FROM series_search
+        JOIN series ON series.seriesId = series_search.rowid
+        WHERE series_search MATCH :query
+          AND series.categoryHidden = 0
+          AND (:includeAdult = 1 OR series.isAdult = 0)
+        ORDER BY series.name
         LIMIT :limit
         """,
     )
@@ -389,6 +525,7 @@ interface MediaDao {
         JOIN channels AS cur ON cur.streamId = :currentChannelId
         WHERE cur.categoryRemoteId = :categoryId
           AND candidate.categoryRemoteId = :categoryId
+          AND candidate.categoryHidden = 0
           AND (:includeAdult = 1 OR candidate.isAdult = 0)
           AND (
               CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END
@@ -431,6 +568,7 @@ interface MediaDao {
         JOIN channels AS cur ON cur.streamId = :currentChannelId
         WHERE cur.categoryRemoteId = :categoryId
           AND candidate.categoryRemoteId = :categoryId
+          AND candidate.categoryHidden = 0
           AND (:includeAdult = 1 OR candidate.isAdult = 0)
           AND (
               CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END
@@ -472,27 +610,98 @@ interface MediaDao {
     entities = [
         CategoryEntity::class,
         ChannelEntity::class,
+        ChannelSearchEntity::class,
         MovieEntity::class,
+        MovieSearchEntity::class,
         SeriesEntity::class,
+        SeriesSearchEntity::class,
         EpisodeEntity::class,
         EpgEventEntity::class,
         FavoriteItemEntity::class,
         PlaybackHistoryEntity::class,
         RecentChannelEntity::class,
     ],
-    version = 1,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
 
     companion object {
+        private val MIGRATION_1_5 = object : Migration(1, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE categories ADD COLUMN syncToken INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE channels ADD COLUMN categoryHidden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE channels ADD COLUMN syncToken INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE movies ADD COLUMN categoryHidden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE movies ADD COLUMN syncToken INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE series ADD COLUMN categoryHidden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE series ADD COLUMN syncToken INTEGER NOT NULL DEFAULT 0")
+
+                db.execSQL(
+                    """
+                    UPDATE channels
+                    SET categoryHidden = 1
+                    WHERE categoryRemoteId IN (
+                        SELECT remoteId FROM categories WHERE section = 'live' AND hidden = 1
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    UPDATE movies
+                    SET categoryHidden = 1
+                    WHERE categoryRemoteId IN (
+                        SELECT remoteId FROM categories WHERE section = 'movies' AND hidden = 1
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    UPDATE series
+                    SET categoryHidden = 1
+                    WHERE categoryRemoteId IN (
+                        SELECT remoteId FROM categories WHERE section = 'series' AND hidden = 1
+                    )
+                    """.trimIndent(),
+                )
+
+                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS channel_search USING FTS4(name, tokenize=unicode61)")
+                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS movie_search USING FTS4(name, tokenize=unicode61)")
+                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS series_search USING FTS4(name, tokenize=unicode61)")
+                db.execSQL("INSERT INTO channel_search(rowid, name) SELECT streamId, name FROM channels")
+                db.execSQL("INSERT INTO movie_search(rowid, name) SELECT streamId, name FROM movies")
+                db.execSQL("INSERT INTO series_search(rowid, name) SELECT seriesId, name FROM series")
+
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_categories_section_hidden_isAdult_sortOrder_name ON categories(section, hidden, isAdult, sortOrder, name)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_categories_syncToken ON categories(syncToken)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_channels_categoryRemoteId_categoryHidden_isAdult_channelNumber_name_streamId ON channels(categoryRemoteId, categoryHidden, isAdult, channelNumber, name, streamId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_channels_syncToken ON channels(syncToken)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_movies_categoryRemoteId_categoryHidden_isAdult_name_streamId ON movies(categoryRemoteId, categoryHidden, isAdult, name, streamId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_movies_syncToken ON movies(syncToken)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_series_categoryRemoteId_categoryHidden_isAdult_name_seriesId ON series(categoryRemoteId, categoryHidden, isAdult, name, seriesId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_series_syncToken ON series(syncToken)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_episodes_seriesId_seasonNumber_episodeNumber_episodeId ON episodes(seriesId, seasonNumber, episodeNumber, episodeId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_epg_events_channelEpgId_endEpochMillis_startEpochMillis ON epg_events(channelEpgId, endEpochMillis, startEpochMillis)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_favorite_items_targetType_addedAt ON favorite_items(targetType, addedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_playback_history_lastPlayedAt ON playback_history(lastPlayedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_recent_channels_lastPlayedAt ON recent_channels(lastPlayedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_recent_channels_categoryId_lastPlayedAt ON recent_channels(categoryId, lastPlayedAt)")
+            }
+        }
+
         fun create(context: Context): AppDatabase {
-            return Room.databaseBuilder(
+            val builder = Room.databaseBuilder(
                 context,
                 AppDatabase::class.java,
                 "aurora_tv.db",
-            ).fallbackToDestructiveMigration(dropAllTables = false).build()
+            ).addMigrations(MIGRATION_1_5)
+
+            if (BuildConfig.DEBUG) {
+                builder.fallbackToDestructiveMigration(dropAllTables = false)
+            }
+
+            return builder.build()
         }
     }
 }

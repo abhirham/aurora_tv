@@ -130,16 +130,19 @@ Domain types (no Room/HTTP deps).
 
 ---
 
-### `app/src/main/java/com/codexlabs/auroratv/data/AppDatabase.kt` (498 lines)
-Room schema + DAO + database class. Version 1, exportSchema=true, explicit destructive fallback only for unmigrated versions.
+### `app/src/main/java/com/codexlabs/auroratv/data/AppDatabase.kt`
+Room schema + DAO + database class. Version 5, exportSchema=true, migrates v1 to v5, with destructive fallback only in debug builds.
+
+### `app/schemas/com.codexlabs.auroratv.data.AppDatabase/5.json`
+Exported Room schema for the current database version, including sync tokens, denormalized hidden-category flags, FTS search tables, and performance indexes.
 
 **Entities (lines 16–149):**
 | Entity | PK | Notable fields |
 |---|---|---|
-| `CategoryEntity` | (section, remoteId) | name, isAdult, hidden, sortOrder |
-| `ChannelEntity` | streamId | categoryRemoteId, channelNumber, logoUrl, epgChannelId, hasCatchup |
-| `MovieEntity` | streamId | categoryRemoteId, artworkUrl, plot, rating, releaseYear |
-| `SeriesEntity` | seriesId | categoryRemoteId, artworkUrl, plot, rating, releaseYear |
+| `CategoryEntity` | (section, remoteId) | name, isAdult, hidden, sortOrder, syncToken |
+| `ChannelEntity` | streamId | categoryRemoteId, categoryHidden, channelNumber, logoUrl, epgChannelId, hasCatchup, syncToken |
+| `MovieEntity` | streamId | categoryRemoteId, categoryHidden, artworkUrl, plot, rating, releaseYear, syncToken |
+| `SeriesEntity` | seriesId | categoryRemoteId, categoryHidden, artworkUrl, plot, rating, releaseYear, syncToken |
 | `EpisodeEntity` | episodeId | seriesId, seasonNumber, episodeNumber, durationSeconds |
 | `EpgEventEntity` | (channelEpgId, startEpochMillis) | endEpochMillis, title, description |
 | `FavoriteItemEntity` | (targetType, targetId) | title, subtitle, artworkUrl, addedAt |
@@ -229,10 +232,22 @@ Fullscreen ExoPlayer player + overlay controls + track selection + PiP.
 Plugins (apply false): AGP `8.13.0`, Kotlin `2.2.20`, Compose plugin `2.2.20`, KSP `2.2.20-2.0.3`.
 
 ### `settings.gradle.kts`
-Foojay toolchain resolver, FAIL_ON_PROJECT_REPOS, includes `:app`. Root project `AuroraTV`.
+Foojay toolchain resolver, FAIL_ON_PROJECT_REPOS, includes `:app` and `:benchmark`. Root project `AuroraTV`.
+
+### `benchmark/build.gradle.kts`
+Macrobenchmark test module targeting `:app`. Uses AndroidX Benchmark Macro, AndroidX Test runner/JUnit, and UiAutomator.
+
+### `benchmark/src/main/java/com/codexlabs/auroratv/benchmark/AuroraMacrobenchmark.kt`
+Macrobenchmark coverage for cold start, home rail browsing, live navigation/channel zapping, movie/series grid browsing, search, and player launch.
+
+### `benchmark/src/main/java/com/codexlabs/auroratv/benchmark/AuroraBaselineProfileGenerator.kt`
+BaselineProfileRule generator that walks the main TV navigation path for baseline profile collection.
+
+### `.github/workflows/compose-reports.yml`
+CI workflow that runs `:app:assembleRelease` with Compose compiler reports enabled and uploads the report directory as an artifact.
 
 ### `app/src/main/AndroidManifest.xml`
-Permissions: INTERNET, ACCESS_NETWORK_STATE, WAKE_LOCK, FOREGROUND_SERVICE_MEDIA_PLAYBACK. Features: `android.software.leanback` (required), touchscreen optional. Application: `AuroraTvApplication`, theme `Theme.AuroraTV`, `usesCleartextTraffic=true`. Activities: `MainActivity` (LEANBACK_LAUNCHER, landscape), `PlayerActivity` (singleTask, supportsPictureInPicture, resizeable).
+Permissions: INTERNET, ACCESS_NETWORK_STATE, WAKE_LOCK. Features: `android.software.leanback` (required), touchscreen optional. Application: `AuroraTvApplication`, theme `Theme.AuroraTV`, `usesCleartextTraffic=true`. Activities: `MainActivity` (LEANBACK_LAUNCHER, landscape), `PlayerActivity` (singleTask, supportsPictureInPicture, resizeable).
 
 ### `app/src/main/res/values/strings.xml`
 App name "Aurora TV", provider hints, section labels, settings strings, action labels, sync labels.

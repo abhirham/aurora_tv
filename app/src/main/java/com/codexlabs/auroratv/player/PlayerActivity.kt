@@ -56,6 +56,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
 import com.codexlabs.auroratv.app.configureTvWindow
 import com.codexlabs.auroratv.data.AppSettings
 import com.codexlabs.auroratv.data.BufferProfile
@@ -91,6 +93,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
@@ -116,10 +119,15 @@ private val TvSelectKeys = setOf(
     Key.NumPadEnter,
 )
 
+private suspend fun FocusRequester.requestFocusAfterComposition() {
+    withFrameNanos { }
+    runCatching { requestFocus() }
+}
+
 private const val SEEK_STEP_MS = 10_000L
 private const val SEEK_REPEAT_INITIAL_DELAY_MS = 500L
 private const val SEEK_REPEAT_INTERVAL_MS = 100L
-private const val PLAYBACK_PROGRESS_UPDATE_MS = 100L
+private const val PLAYBACK_PROGRESS_UPDATE_MS = 350L
 
 private val PlayerOverlayHorizontalPadding = 56.dp
 private val PlayerOverlayTopPadding = 44.dp
@@ -127,8 +135,21 @@ private val PlayerOverlayBottomPadding = 42.dp
 private val PlayerControlPillColor = Color(0x778A98A6)
 private val PlayerControlPillFocusedColor = Color.White
 private val PlayerControlPillContentColor = Color.White
+private val PlayerGuideTimeFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("HH:mm", Locale.getDefault())
+}
+private val LanguageTagRegex = Regex("^[A-Za-z]{2,3}(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?$")
+private val SevenOneChannelRegex = Regex("(^|[^0-9])7\\.1([^0-9]|$)", RegexOption.IGNORE_CASE)
+private val FiveOneChannelRegex = Regex("(^|[^0-9])5\\.1([^0-9]|$)", RegexOption.IGNORE_CASE)
+private val StereoChannelRegex = Regex("(^|[^0-9])2\\.0([^0-9]|$)|stereo", RegexOption.IGNORE_CASE)
+private val MonoChannelRegex = Regex("(^|[^0-9])1\\.0([^0-9]|$)|mono", RegexOption.IGNORE_CASE)
 
-private val KnownTrackLanguageNames: List<String> by lazy {
+private data class KnownTrackLanguageName(
+    val name: String,
+    val matcher: Regex,
+)
+
+private val KnownTrackLanguageNames: List<KnownTrackLanguageName> by lazy {
     Locale.getAvailableLocales()
         .flatMap { locale ->
             listOf(
@@ -142,6 +163,15 @@ private val KnownTrackLanguageNames: List<String> by lazy {
         }
         .distinctBy { it.lowercase(Locale.US) }
         .sortedByDescending { it.length }
+        .map { languageName ->
+            KnownTrackLanguageName(
+                name = languageName,
+                matcher = Regex(
+                    pattern = "(^|[^\\p{L}])${Regex.escape(languageName)}([^\\p{L}]|$)",
+                    option = RegexOption.IGNORE_CASE,
+                ),
+            )
+        }
 }
 
 private data class SubtitleTrackOption(
@@ -163,6 +193,19 @@ private data class AudioTrackOption(
 private data class AudioTrackLabels(
     val shortLabel: String,
     val detailLabel: String,
+)
+
+private data class TrackOptionSignature(
+    val type: Int,
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val language: String?,
+    val label: String?,
+    val channelCount: Int,
+    val roleFlags: Int,
+    val selectionFlags: Int,
+    val selected: Boolean,
+    val supported: Boolean,
 )
 
 class PlayerActivity : ComponentActivity() {
@@ -216,8 +259,10 @@ class PlayerActivity : ComponentActivity() {
         mediaSession = MediaSession.Builder(this, player).build()
 
         lifecycleScope.launch {
-            viewModel.settings.collect { settings ->
-                currentSettings = settings
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.settings.collect { settings ->
+                    currentSettings = settings
+                }
             }
         }
 
@@ -297,6 +342,30 @@ class PlayerActivity : ComponentActivity() {
                 revealOverlay(event.keyCode)
                 return true
             }
+            KeyEvent.KEYCODE_CHANNEL_UP -> {
+                switchChannel(1)
+                revealOverlay(event.keyCode)
+                return true
+            }
+            KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                switchChannel(-1)
+                revealOverlay(event.keyCode)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                if (activeDescriptor?.isLive == false) {
+                    seekBy(SEEK_STEP_MS)
+                    revealOverlay(event.keyCode)
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                if (activeDescriptor?.isLive == false) {
+                    seekBy(-SEEK_STEP_MS)
+                    revealOverlay(event.keyCode)
+                    return true
+                }
+            }
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_DPAD_UP,
@@ -357,13 +426,22 @@ class PlayerActivity : ComponentActivity() {
         activeDescriptor = descriptor
         overlayVisible = true
         errorMessage = null
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .build()
 
         val mediaItem = MediaItem.Builder()
             .setUri(descriptor.mediaUrl)
             .setMediaId("${descriptor.targetType.rawValue}:${descriptor.targetId}")
             .apply {
                 if (descriptor.isLive) {
-                    setLiveConfiguration(MediaItem.LiveConfiguration.Builder().build())
+                    setLiveConfiguration(
+                        MediaItem.LiveConfiguration.Builder()
+                            .setTargetOffsetMs(currentSettings.bufferProfile.liveTargetOffsetMs())
+                            .build(),
+                    )
                 }
             }
             .build()
@@ -466,6 +544,14 @@ class PlayerActivity : ComponentActivity() {
     }
 }
 
+private fun BufferProfile.liveTargetOffsetMs(): Long {
+    return when (this) {
+        BufferProfile.LOW_LATENCY -> 1_500L
+        BufferProfile.BALANCED -> 6_000L
+        BufferProfile.STABLE -> 12_000L
+    }
+}
+
 @Composable
 private fun PlayerScreen(
     viewModel: MainViewModel,
@@ -489,6 +575,7 @@ private fun PlayerScreen(
     var playbackState by remember { mutableIntStateOf(player.playbackState) }
     var audioOptions by remember { mutableStateOf(audioTrackOptions(player.currentTracks)) }
     var subtitleOptions by remember { mutableStateOf(subtitleTrackOptions(player.currentTracks)) }
+    var trackSignature by remember { mutableStateOf(trackOptionSignature(player.currentTracks)) }
     var languageOptionsVisible by remember { mutableStateOf(false) }
 
     val guideFlow: Flow<List<EpgEventEntity>> = remember(descriptor?.targetId, descriptor?.isLive) {
@@ -500,7 +587,8 @@ private fun PlayerScreen(
     }
     val guide by guideFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
-    val positionAndDuration by produceState(initialValue = 0L to 0L, descriptor?.targetId) {
+    val positionAndDuration by produceState(initialValue = 0L to 0L, descriptor?.targetId, overlayVisible) {
+        if (!overlayVisible) return@produceState
         while (true) {
             value = player.currentPosition to (player.duration.takeIf { it > 0 } ?: 0L)
             delay(PLAYBACK_PROGRESS_UPDATE_MS)
@@ -545,12 +633,17 @@ private fun PlayerScreen(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
-                audioOptions = audioTrackOptions(tracks)
-                subtitleOptions = subtitleTrackOptions(tracks)
+                val nextSignature = trackOptionSignature(tracks)
+                if (nextSignature != trackSignature) {
+                    trackSignature = nextSignature
+                    audioOptions = audioTrackOptions(tracks)
+                    subtitleOptions = subtitleTrackOptions(tracks)
+                }
             }
         }
         player.addListener(listener)
         playbackState = player.playbackState
+        trackSignature = trackOptionSignature(player.currentTracks)
         audioOptions = audioTrackOptions(player.currentTracks)
         subtitleOptions = subtitleTrackOptions(player.currentTracks)
         onDispose {
@@ -692,8 +785,7 @@ private fun PlayerOverlay(
     val playButtonFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        delay(50)
-        playButtonFocusRequester.requestFocus()
+        playButtonFocusRequester.requestFocusAfterComposition()
     }
 
     Box(
@@ -917,8 +1009,7 @@ private fun LanguageOptionsSidebar(
     val originalAudioOption = originalAudioOption(audioOptions)
 
     LaunchedEffect(Unit) {
-        delay(50)
-        firstFocusRequester.requestFocus()
+        firstFocusRequester.requestFocusAfterComposition()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1317,6 +1408,30 @@ private fun subtitleTrackOptions(
         }
 }
 
+private fun trackOptionSignature(tracks: Tracks): List<TrackOptionSignature> {
+    return tracks.groups.flatMapIndexed { groupIndex, group ->
+        if (group.type != C.TRACK_TYPE_AUDIO && group.type != C.TRACK_TYPE_TEXT) {
+            emptyList<TrackOptionSignature>()
+        } else {
+            (0 until group.length).map { trackIndex ->
+                val format = group.getTrackFormat(trackIndex)
+                TrackOptionSignature(
+                    type = group.type,
+                    groupIndex = groupIndex,
+                    trackIndex = trackIndex,
+                    language = format.language,
+                    label = format.label,
+                    channelCount = format.channelCount,
+                    roleFlags = format.roleFlags,
+                    selectionFlags = format.selectionFlags,
+                    selected = group.isTrackSelected(trackIndex),
+                    supported = group.isTrackSupported(trackIndex, true),
+                )
+            }
+        }
+    }
+}
+
 private fun selectAudioTrack(player: Player, option: AudioTrackOption) {
     player.trackSelectionParameters = player.trackSelectionParameters
         .buildUpon()
@@ -1394,8 +1509,7 @@ private fun displayLanguageName(languageTag: String?): String? {
 }
 
 private fun isLikelyLanguageTag(languageTag: String): Boolean {
-    return Regex("^[A-Za-z]{2,3}(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?$")
-        .matches(languageTag)
+    return LanguageTagRegex.matches(languageTag)
 }
 
 private fun extractLanguageName(rawTrackText: String?): String? {
@@ -1404,12 +1518,7 @@ private fun extractLanguageName(rawTrackText: String?): String? {
         ?.takeIf { it.isNotBlank() }
         ?: return null
 
-    return KnownTrackLanguageNames.firstOrNull { languageName ->
-        Regex(
-            pattern = "(^|[^\\p{L}])${Regex.escape(languageName)}([^\\p{L}]|$)",
-            option = RegexOption.IGNORE_CASE,
-        ).containsMatchIn(normalizedTrackText)
-    }
+    return KnownTrackLanguageNames.firstOrNull { it.matcher.containsMatchIn(normalizedTrackText) }?.name
 }
 
 private fun audioChannelLabel(format: Format): String? {
@@ -1425,10 +1534,10 @@ private fun audioChannelLabel(format: Format): String? {
 private fun audioChannelLabelFromRawText(rawTrackText: String?): String? {
     val rawText = rawTrackText?.takeIf { it.isNotBlank() } ?: return null
     return when {
-        Regex("(?i)(^|[^0-9])7\\.1([^0-9]|$)").containsMatchIn(rawText) -> "7.1 surround sound"
-        Regex("(?i)(^|[^0-9])5\\.1([^0-9]|$)").containsMatchIn(rawText) -> "5.1 surround sound"
-        Regex("(?i)(^|[^0-9])2\\.0([^0-9]|$)|stereo").containsMatchIn(rawText) -> "Stereo"
-        Regex("(?i)(^|[^0-9])1\\.0([^0-9]|$)|mono").containsMatchIn(rawText) -> "Mono"
+        SevenOneChannelRegex.containsMatchIn(rawText) -> "7.1 surround sound"
+        FiveOneChannelRegex.containsMatchIn(rawText) -> "5.1 surround sound"
+        StereoChannelRegex.containsMatchIn(rawText) -> "Stereo"
+        MonoChannelRegex.containsMatchIn(rawText) -> "Mono"
         else -> null
     }
 }
@@ -1480,7 +1589,7 @@ private fun isSameTrackGroup(first: TrackGroup, second: TrackGroup): Boolean {
 }
 
 private fun formatGuideTime(event: EpgEventEntity): String {
-    val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val formatter = checkNotNull(PlayerGuideTimeFormatter.get())
     return "${formatter.format(Date(event.startEpochMillis))}-${formatter.format(Date(event.endEpochMillis))}"
 }
 
@@ -1491,8 +1600,12 @@ private fun formatProgressTime(timeMs: Long): String {
     val minutes = (totalSeconds % 3_600) / 60
     val seconds = totalSeconds % 60
     return if (hours > 0) {
-        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+        "$hours:${minutes.twoDigitString()}:${seconds.twoDigitString()}"
     } else {
-        String.format(Locale.US, "%02d:%02d", minutes, seconds)
+        "${minutes.twoDigitString()}:${seconds.twoDigitString()}"
     }
+}
+
+private fun Long.twoDigitString(): String {
+    return if (this < 10) "0$this" else toString()
 }
