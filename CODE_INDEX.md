@@ -24,6 +24,11 @@ Android TV IPTV client built with Jetpack Compose + Room + ExoPlayer + Xtream AP
 
 ## Source Files
 
+### `plan.md`
+Performance review todo plan. Tracks prioritized work for lazy subtitles, lazy EPG, paged browsing, staged sync, Room indexes, indexed search, player overlay recomposition, playback launch cleanup, image caching, and benchmarking.
+
+---
+
 ### `app/src/main/java/com/codexlabs/auroratv/ui/MainActivity.kt` (31 lines)
 Launcher Activity. Sets Compose content (`AuroraTvApp` inside `AuroraTheme`). Calls `configureTvWindow()` on create and on focus regain to keep system bars hidden.
 
