@@ -29,55 +29,49 @@ Launcher Activity. Sets Compose content (`AuroraTvApp` inside `AuroraTheme`). Ca
 
 ---
 
-### `app/src/main/java/com/codexlabs/auroratv/ui/AuroraTvApp.kt` (3612 lines) ⭐ LARGEST UI FILE
+### `app/src/main/java/com/codexlabs/auroratv/ui/AuroraTvApp.kt` (3122 lines) ⭐ LARGEST UI FILE
 Owns the entire main TV UI: screens, navigation, dialogs, tiles. **Most UI changes touch this file.**
 
 | Composable / Function | Lines | Purpose |
 |---|---|---|
-| `AuroraTvApp` | 161–335 | Root state, section selection, screen router, dialog host |
-| `StreamingTopNav` | 337–455 | Top nav bar (Home/Live/Movies/Series/Search/Settings, sync status) |
-| `TopNavItem` | 457–499 | Focusable tab button |
-| `TopNavIconOnly` | 501–536 | Icon-only nav button (Search) |
-| `Header` | 538–624 | Dashboard header w/ Aurora branding, stats, refresh |
-| `SummaryCard` | 626–673 | Count card (Channels/Movies/Series/etc.) |
-| `SectionTabs` | 675–718 | Legacy horizontal tab row |
-| `SetupScreen` | 720–813 | Provider connection dialog (URL/user/pass) |
-| `HomeScreen` | 815–1004 | Home: continue watching, top picks, featured |
-| `NetflixSmallRail` | 1006–1043 | Horizontal carousel with title |
-| `NetflixRailTile` | 1045–1086 | Small thumbnail tile w/ focus border |
-| `NetflixPrimaryTile` | 1088–1174 | Large featured tile w/ play button |
-| `NetflixFeatureTile` | 1176–1257 | Large tile w/ bottom gradient |
-| `HomeHero` | 1302–1377 | Hero banner (art, title, description, play) |
-| `LiveTvScreen` | 1379–1470 | Live TV: categories + channels + EPG grid |
-| `MockupLiveRail` | 1472–1520 | Category sidebar |
-| `MockupRailItem` | 1522–1563 | Category button |
-| `MockupLiveHero` | 1565–1703 | Hero w/ current channel, now/next, play |
-| `MockupEpgGrid` | 1705–1821 | EPG grid (channels × time slots) |
-| `MovieScreen` | 1823–1859 | Movies: category filter + grid |
-| `SeriesScreen` | 1861–1897 | Series: category filter + grid |
-| `LibraryGridLayout` | 1899–1962 | Reusable category sidebar + poster grid |
-| `PosterTile` | 1964–2002 | Movie/series poster |
-| `SearchScreen` | 2004–2106 | Search input + grouped results |
-| `SearchResultSection` | 2108–2169 | One-type result group |
-| `SettingsScreen` | 2171–2413 | Settings (creds, sync, buffers, player, PIN) |
-| `SettingToggleRow` | 2415–2449 | Toggle switch row |
-| `SetupActionButton` | 2451–2499 | TV-friendly large button |
-| `PlayerPreferenceButton` | 2501–2524 | Small preference button |
-| `LiveHeroPanel` | 2526–2688 | Alt hero layout (unused) |
-| `LiveCategoryColumn` | 2690–2729 | Category list panel |
-| `LiveChannelColumn` | 2731–2794 | Channel list panel |
-| `LiveGuideTimeline` | 2796–2857 | Horizontal EPG timeline |
-| `LiveDetailPanel` | 2859–3003 | Right panel w/ channel details + guide |
-| `MovieDialog` | 3005–3087 | Fullscreen movie details + play |
-| `SeriesDialog` | 3089–3199+ | Fullscreen series details, season selector, episodes |
+| `AuroraTvApp` | 159–342 | Root state, section selection, screen router, dialog host |
+| `StreamingTopNav` | 345–471 | Top nav bar (Home/Live/Movies/Series/Search/Settings, sync status) |
+| `TopNavItem` | 474–517 | Focusable tab button |
+| `TopNavIconOnly` | 520–556 | Icon-only nav button (Search) |
+| `SetupScreen` | 559–651 | Provider connection dialog (URL/user/pass) |
+| `HomeScreen` | 654–849 | Home: continue watching, top picks, featured |
+| `NetflixSmallRail` | 852–888 | Horizontal carousel with title |
+| `NetflixRailTile` | 891–931 | Small thumbnail tile w/ focus border |
+| `NetflixPrimaryTile` | 934–1019 | Large featured tile w/ play button |
+| `NetflixFeatureTile` | 1022–1102 | Large tile w/ bottom gradient |
+| `NetflixPosterTile` | 1105–1145 | Poster tile for home strips |
+| `HomeHero` | 1148–1222 | Hero banner (art, title, description, play) |
+| `LiveTvScreen` | 1225–1322 | Live TV: categories + channels + EPG grid |
+| `LiveCategoryRail` | 1325–1387 | Category sidebar |
+| `LiveRailHeader` | 1390–1422 | Category rail header |
+| `LiveRailItem` | 1425–1472 | Category button |
+| `LiveHero` | 1475–1612 | Hero w/ current channel, now/next, play |
+| `LiveEpgGrid` | 1615–1735 | EPG grid (channels × time slots) |
+| `MovieScreen` | 1738–1780 | Movies: category filter + grid |
+| `SeriesScreen` | 1783–1826 | Series: category filter + grid |
+| `LibraryGridLayout` | 1829–1923 | Reusable category sidebar + poster grid |
+| `PosterTile` | 1926–1963 | Movie/series poster |
+| `SearchScreen` | 1966–2067 | Search input + grouped results |
+| `SearchResultSection` | 2070–2130 | One-type result group |
+| `SettingsScreen` | 2133–2390 | Settings (creds, sync, buffers, player, PIN) |
+| `SettingToggleRow` | 2393–2426 | Toggle switch row |
+| `SetupActionButton` | 2429–2476 | TV-friendly large button |
+| `PlayerPreferenceButton` | 2479–2501 | Small preference button |
+| `MovieDialog` | 2504–2585 | Fullscreen movie details + play |
+| `SeriesDialog` | 2588–2787 | Fullscreen series details, season selector, episodes |
 
-**Helpers in this file:** `dpadFocusRoute()`, `formatLastSync()`, `progressLabel()`, `launchPlayback()`, `homeMetadata()`, `homeDescription()`, `formatEpgTime()`, `formatEpgShortTime()`, `formatEpgClockRange()`, `darkTextFieldColors()`, `FocusCard()`, `TvActionButton()`, `Artwork()`, `EmptyState()`, `StripCard` data class.
+**Helpers in this file:** `dpadFocusRoute()`, `progressLabel()`, `launchPlayback()`, `homeMetadata()`, `homeDescription()`, `formatEpgClockRange()`, `darkTextFieldColors()`, `FocusCard()`, `TvActionButton()`, `Artwork()`, `EmptyState()`, `LoadingState()`, `StripCard` data class.
 
 **For new screens:** add value to `LibrarySection` enum (in `DomainModels.kt`), add Composable here, route in `AuroraTvApp`.
 
 ---
 
-### `app/src/main/java/com/codexlabs/auroratv/ui/MainViewModel.kt` (264 lines)
+### `app/src/main/java/com/codexlabs/auroratv/ui/MainViewModel.kt` (261 lines)
 Central state hub (AndroidViewModel). Owns settings, library stats, search, favorites, continue-watching, playback resolution.
 
 **StateFlows exposed:** `settings`, `libraryStats`, `isSyncing`, `syncMessage`, `searchQuery`, `searchResults`, `continueWatching`, `recentChannels`, `favoriteChannels`, `favoriteMovies`, `favoriteSeries`.
@@ -131,8 +125,8 @@ Domain types (no Room/HTTP deps).
 
 ---
 
-### `app/src/main/java/com/codexlabs/auroratv/data/AppDatabase.kt` (430 lines)
-Room schema + DAO + database class. Version 1, exportSchema=true, fallbackToDestructiveMigration.
+### `app/src/main/java/com/codexlabs/auroratv/data/AppDatabase.kt` (498 lines)
+Room schema + DAO + database class. Version 1, exportSchema=true, explicit destructive fallback only for unmigrated versions.
 
 **Entities (lines 16–149):**
 | Entity | PK | Notable fields |
@@ -147,7 +141,7 @@ Room schema + DAO + database class. Version 1, exportSchema=true, fallbackToDest
 | `PlaybackHistoryEntity` | id (`"type:id"`) | positionMs, durationMs, lastPlayedAt |
 | `RecentChannelEntity` | channelId | title, artworkUrl, categoryId, lastPlayedAt |
 
-**MediaDao (lines 151–401):** upserts for each entity, clears (`clearChannels/Movies/Series/EpisodesForSeries/Epg/Categories`), Flow-returning observers (`observeVisibleCategories`, `observeChannels`, `observeMovies`, `observeSeries`, `observeEpisodes`, `observeGuide`, `observeFavoriteIds`, `observeFavoriteItems`, `observeContinueWatching`, `observeRecentChannels`, count observers), single-row lookups (`channelById`, `movieById`, `seriesById`, `episodeById`, `nextEpisodeAfter`), search (`searchChannels`, `searchMovies`, `searchSeries`), favorites (`isFavorite`, `deleteFavorite`), `hiddenCategoryIds`, `setCategoryHidden`, `updateSeriesDetails`.
+**MediaDao (lines 152–482):** upserts for each entity, clears (`clearChannels/Movies/Series/EpisodesForSeries/Epg/Categories`), Flow-returning observers (`observeVisibleCategories`, `observeChannels`, `observeMovies`, `observeSeries`, `observeEpisodes`, `observeGuide`, `observeFavoriteItems`, `observeContinueWatching`, `observeRecentChannels`, count observers), single-row lookups (`channelById`, `movieById`, `seriesById`, `episodeById`, `nextEpisodeAfter`), adjacent-channel lookups (`nextChannelInCategory`, `previousChannelInCategory`), search (`searchChannels`, `searchMovies`, `searchSeries`), favorites (`isFavorite`, `deleteFavorite`), `hiddenCategoryIds`, `setCategoryHidden`, `updateSeriesDetails`.
 
 Soft-delete via `hidden` flag on categories. EPG queries filter by `endEpochMillis >= fromEpochMillis`.
 
@@ -172,12 +166,12 @@ HTTP client for Xtream provider API + XMLTV parsing.
 
 ---
 
-### `app/src/main/java/com/codexlabs/auroratv/data/IptvRepository.kt` (452 lines)
+### `app/src/main/java/com/codexlabs/auroratv/data/IptvRepository.kt` (444 lines)
 Bridges DAO + API. Sync orchestrator + playback resolver.
 
-**Flows:** `settings`, `libraryStats: StateFlow<LibraryStats>`, all `observe*` (passthrough to DAO), `observeFavoriteIds/Items`, `observeContinueWatching`, `observeRecentChannels`.
+**Flows:** `settings`, `libraryStats: StateFlow<LibraryStats>`, all `observe*` (passthrough to DAO), `observeFavoriteItems`, `observeContinueWatching`, `observeRecentChannels`.
 
-**Methods:** `syncAll(onProgress)` (categories → channels → movies → series → EPG; preserves hidden state), `ensureSeriesLoaded(seriesId)` (lazy), `ensureGuide(streamId)` (lazy), `search(query, includeAdult)`, `resolvePlaybackDescriptor(targetType, targetId, categoryIdHint)`, `resolveAdjacentChannel(currentId, categoryId, offset, includeAdult)`, `toggleFavorite()`, `setCategoryHidden()`, `updatePlaybackHistory()`, `registerRecentChannel()`.
+**Methods:** `syncAll(onProgress)` (categories → channels → movies → series → EPG; preserves hidden state), `ensureSeriesLoaded(seriesId)` (lazy), `ensureGuide(streamId)` (lazy), `search(query, includeAdult)`, `resolvePlaybackDescriptor(targetType, targetId, categoryIdHint)`, `resolveAdjacentChannel(currentId, categoryId, offset, includeAdult)` (bounded next/previous DAO query), `toggleFavorite()`, `setCategoryHidden()`, `updatePlaybackHistory()`, `registerRecentChannel()`.
 
 EPG sync is best-effort (doesn't fail full sync). Search limits: 24 results per type. History only for non-live.
 
@@ -252,8 +246,8 @@ App name "Aurora TV", provider hints, section labels, settings strings, action l
 |---|---|
 | New screen / section | `LibrarySection` enum (DomainModels.kt) + Composable + route in `AuroraTvApp.kt` |
 | New tile / card style | `AuroraTvApp.kt` (NetflixRailTile / NetflixPrimaryTile / PosterTile area) |
-| Modify EPG grid | `MockupEpgGrid` in `AuroraTvApp.kt` (1705–1821) |
-| Settings UI tweak | `SettingsScreen` in `AuroraTvApp.kt` (2171–2413) |
+| Modify EPG grid | `LiveEpgGrid` in `AuroraTvApp.kt` (1615–1735) |
+| Settings UI tweak | `SettingsScreen` in `AuroraTvApp.kt` (2133–2390) |
 | New persisted setting | `SettingsRepository.kt` + `AppSettings` in `DomainModels.kt` + UI in SettingsScreen + `MainViewModel` setter |
 | New player feature | `PlayerActivity.kt` (composable + key dispatch + ExoPlayer config) |
 | Buffer tuning | `buildLoadControl` in `PlayerActivity.kt` |

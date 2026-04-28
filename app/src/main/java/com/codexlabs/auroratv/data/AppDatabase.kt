@@ -359,9 +359,6 @@ interface MediaDao {
     )
     suspend fun searchSeries(query: String, includeAdult: Boolean, limit: Int): List<SeriesEntity>
 
-    @Query("SELECT targetId FROM favorite_items WHERE targetType = :targetType")
-    fun observeFavoriteIds(targetType: String): Flow<List<String>>
-
     @Query("SELECT COUNT(*) FROM favorite_items")
     fun observeFavoriteCount(): Flow<Int>
 
@@ -388,16 +385,87 @@ interface MediaDao {
 
     @Query(
         """
-        SELECT streamId FROM channels
-        WHERE categoryRemoteId = :categoryId
-          AND (:includeAdult = 1 OR isAdult = 0)
+        SELECT candidate.* FROM channels AS candidate
+        JOIN channels AS cur ON cur.streamId = :currentChannelId
+        WHERE cur.categoryRemoteId = :categoryId
+          AND candidate.categoryRemoteId = :categoryId
+          AND (:includeAdult = 1 OR candidate.isAdult = 0)
+          AND (
+              CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END
+                  > CASE WHEN cur.channelNumber IS NULL THEN 1 ELSE 0 END
+              OR (
+                  CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END
+                      = CASE WHEN cur.channelNumber IS NULL THEN 1 ELSE 0 END
+                  AND (
+                      (cur.channelNumber IS NOT NULL AND candidate.channelNumber > cur.channelNumber)
+                      OR (
+                          (
+                              (cur.channelNumber IS NULL AND candidate.channelNumber IS NULL)
+                              OR candidate.channelNumber = cur.channelNumber
+                          )
+                          AND (
+                              candidate.name > cur.name
+                              OR (candidate.name = cur.name AND candidate.streamId > cur.streamId)
+                          )
+                      )
+                  )
+              )
+          )
         ORDER BY
-            CASE WHEN channelNumber IS NULL THEN 1 ELSE 0 END,
-            channelNumber,
-            name
+            CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END,
+            candidate.channelNumber,
+            candidate.name,
+            candidate.streamId
+        LIMIT 1
         """,
     )
-    suspend fun channelIdsForCategory(categoryId: String, includeAdult: Boolean): List<Long>
+    suspend fun nextChannelInCategory(
+        currentChannelId: Long,
+        categoryId: String,
+        includeAdult: Boolean,
+    ): ChannelEntity?
+
+    @Query(
+        """
+        SELECT candidate.* FROM channels AS candidate
+        JOIN channels AS cur ON cur.streamId = :currentChannelId
+        WHERE cur.categoryRemoteId = :categoryId
+          AND candidate.categoryRemoteId = :categoryId
+          AND (:includeAdult = 1 OR candidate.isAdult = 0)
+          AND (
+              CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END
+                  < CASE WHEN cur.channelNumber IS NULL THEN 1 ELSE 0 END
+              OR (
+                  CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END
+                      = CASE WHEN cur.channelNumber IS NULL THEN 1 ELSE 0 END
+                  AND (
+                      (cur.channelNumber IS NOT NULL AND candidate.channelNumber < cur.channelNumber)
+                      OR (
+                          (
+                              (cur.channelNumber IS NULL AND candidate.channelNumber IS NULL)
+                              OR candidate.channelNumber = cur.channelNumber
+                          )
+                          AND (
+                              candidate.name < cur.name
+                              OR (candidate.name = cur.name AND candidate.streamId < cur.streamId)
+                          )
+                      )
+                  )
+              )
+          )
+        ORDER BY
+            CASE WHEN candidate.channelNumber IS NULL THEN 1 ELSE 0 END DESC,
+            candidate.channelNumber DESC,
+            candidate.name DESC,
+            candidate.streamId DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun previousChannelInCategory(
+        currentChannelId: Long,
+        categoryId: String,
+        includeAdult: Boolean,
+    ): ChannelEntity?
 }
 
 @Database(
@@ -424,7 +492,7 @@ abstract class AppDatabase : RoomDatabase() {
                 context,
                 AppDatabase::class.java,
                 "aurora_tv.db",
-            ).fallbackToDestructiveMigration().build()
+            ).fallbackToDestructiveMigration(dropAllTables = false).build()
         }
     }
 }

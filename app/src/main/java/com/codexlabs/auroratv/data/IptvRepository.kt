@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
@@ -66,10 +65,6 @@ class IptvRepository(
         }
     }
 
-    fun observeFavoriteIds(targetType: TargetType): Flow<Set<String>> {
-        return dao.observeFavoriteIds(targetType.rawValue).map { it.toSet() }
-    }
-
     fun observeFavoriteItems(targetType: TargetType, limit: Int = 24): Flow<List<FavoriteItemEntity>> {
         return dao.observeFavoriteItems(targetType.rawValue, limit)
     }
@@ -83,7 +78,7 @@ class IptvRepository(
     }
 
     suspend fun syncAll(onProgress: suspend (String) -> Unit = {}) = withContext(Dispatchers.IO) {
-        val settings = settingsRepository.settings.map { it }.firstBlocking()
+        val settings = settingsRepository.settings.first()
         val credentials = settings.credentialsOrNull() ?: error("Provider is not configured")
 
         val liveCategories = xtreamApi.fetchCategories(credentials, LibrarySection.LIVE)
@@ -191,7 +186,7 @@ class IptvRepository(
 
     suspend fun ensureSeriesLoaded(seriesId: Long) = withContext(Dispatchers.IO) {
         if (dao.episodeCountForSeries(seriesId) > 0) return@withContext
-        val settings = settingsRepository.settings.map { it }.firstBlocking()
+        val settings = settingsRepository.settings.first()
         val credentials = settings.credentialsOrNull() ?: return@withContext
         val detail = xtreamApi.fetchSeriesInfo(credentials, seriesId)
         dao.clearEpisodesForSeries(seriesId)
@@ -294,7 +289,7 @@ class IptvRepository(
         targetId: String,
         categoryIdHint: String? = null,
     ): PlaybackDescriptor = withContext(Dispatchers.IO) {
-        val settings = settingsRepository.settings.map { it }.firstBlocking()
+        val settings = settingsRepository.settings.first()
         val credentials = settings.credentialsOrNull() ?: error("Provider is not configured")
 
         when (targetType) {
@@ -354,14 +349,15 @@ class IptvRepository(
         offset: Int,
         includeAdult: Boolean,
     ): PlaybackDescriptor? = withContext(Dispatchers.IO) {
-        val ids = dao.channelIdsForCategory(categoryId, includeAdult)
-        if (ids.isEmpty()) return@withContext null
-        val currentIndex = ids.indexOf(currentChannelId).takeIf { it >= 0 } ?: 0
-        val nextIndex = (currentIndex + offset).coerceIn(0, ids.lastIndex)
-        if (nextIndex == currentIndex) return@withContext null
+        if (offset == 0) return@withContext null
+        val adjacentChannel = if (offset > 0) {
+            dao.nextChannelInCategory(currentChannelId, categoryId, includeAdult)
+        } else {
+            dao.previousChannelInCategory(currentChannelId, categoryId, includeAdult)
+        } ?: return@withContext null
         resolvePlaybackDescriptor(
             targetType = TargetType.CHANNEL,
-            targetId = ids[nextIndex].toString(),
+            targetId = adjacentChannel.streamId.toString(),
             categoryIdHint = categoryId,
         )
     }
@@ -370,7 +366,7 @@ class IptvRepository(
         val channel = dao.channelById(streamId) ?: return@withContext
         val epgChannelId = channel.epgChannelId ?: return@withContext
         if (dao.futureGuideCount(epgChannelId, System.currentTimeMillis()) > 0) return@withContext
-        val settings = settingsRepository.settings.map { it }.firstBlocking()
+        val settings = settingsRepository.settings.first()
         val credentials = settings.credentialsOrNull() ?: return@withContext
         val guide = xtreamApi.fetchShortEpg(credentials, streamId, epgChannelId)
         if (guide.isNotEmpty()) {
@@ -445,8 +441,4 @@ class IptvRepository(
             },
         )
     }
-}
-
-private suspend fun <T> Flow<T>.firstBlocking(): T {
-    return first()
 }

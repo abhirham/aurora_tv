@@ -43,7 +43,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.LiveTv
-import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -109,7 +108,6 @@ import com.codexlabs.auroratv.data.SearchResultItem
 import com.codexlabs.auroratv.data.SeriesEntity
 import com.codexlabs.auroratv.data.TargetType
 import com.codexlabs.auroratv.player.PlayerActivity
-import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -162,7 +160,6 @@ fun AuroraTvApp(
     viewModel: MainViewModel = viewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val stats by viewModel.libraryStats.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
@@ -555,196 +552,6 @@ private fun TopNavIconOnly(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(24.dp))
-    }
-}
-
-@Composable
-private fun Header(
-    appSettings: AppSettings,
-    stats: com.codexlabs.auroratv.data.LibraryStats,
-    syncMessage: String?,
-    isSyncing: Boolean,
-    onRefresh: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(NetflixRed),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("A", fontWeight = FontWeight.Black, color = Color.White)
-                }
-                Column {
-                    Text(
-                        text = "AURORA TV",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = "Live channels, guide data, movies, and series from ${appSettings.providerBaseUrl.ifBlank { "your Xtream provider" }}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MutedText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TvActionButton(
-                    onClick = onRefresh,
-                    enabled = !isSyncing,
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    if (isSyncing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = MutedText,
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(Icons.Rounded.Refresh, contentDescription = null)
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(if (isSyncing) "Syncing..." else "Refresh")
-                }
-                Text(
-                    text = "Last sync: ${formatLastSync(appSettings.lastSyncEpochMillis)}",
-                    color = MutedText,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SummaryCard("Channels", stats.liveChannels.toString(), Icons.Rounded.LiveTv, Modifier.weight(1f))
-            SummaryCard("Movies", stats.movies.toString(), Icons.Rounded.Movie, Modifier.weight(1f))
-            SummaryCard("Series", stats.series.toString(), Icons.Rounded.Tv, Modifier.weight(1f))
-            SummaryCard("Episodes", stats.episodes.toString(), Icons.Rounded.GridView, Modifier.weight(1f))
-            SummaryCard("Favorites", stats.favorites.toString(), Icons.Rounded.Favorite, Modifier.weight(1f))
-        }
-
-        syncMessage?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                text = it,
-                color = if (isSyncing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SummaryCard(
-    label: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.height(74.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = PanelRaised.copy(alpha = 0.86f),
-        tonalElevation = 0.dp,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF252525)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = NetflixRed, modifier = Modifier.size(20.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MutedText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionTabs(
-    selected: LibrarySection,
-    onSelected: (LibrarySection) -> Unit,
-) {
-    val tabs = listOf(
-        LibrarySection.HOME to "Home",
-        LibrarySection.LIVE to "Live TV",
-        LibrarySection.MOVIES to "Movies",
-        LibrarySection.SERIES to "Series",
-        LibrarySection.SEARCH to "Search",
-        LibrarySection.SETTINGS to "Settings",
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        tabs.forEach { (section, label) ->
-            FocusCard(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(54.dp),
-                selected = selected == section,
-                onClick = { onSelected(section) },
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -1466,7 +1273,7 @@ private fun LiveTvScreen(
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        MockupLiveRail(
+        LiveCategoryRail(
             modifier = Modifier
                 .width(160.dp)
                 .fillMaxHeight(),
@@ -1486,7 +1293,7 @@ private fun LiveTvScreen(
                 .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            MockupLiveHero(
+            LiveHero(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
@@ -1496,7 +1303,7 @@ private fun LiveTvScreen(
                 onPlay = { highlightedChannel?.let { onPlayChannel(it, selectedCategoryId) } },
             )
 
-            MockupEpgGrid(
+            LiveEpgGrid(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(370.dp),
@@ -1515,7 +1322,7 @@ private fun LiveTvScreen(
 }
 
 @Composable
-private fun MockupLiveRail(
+private fun LiveCategoryRail(
     modifier: Modifier,
     categories: List<CategoryEntity>,
     selectedCategoryId: String?,
@@ -1545,7 +1352,7 @@ private fun MockupLiveRail(
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MockupRailHeader(
+            LiveRailHeader(
                 label = "Live",
                 icon = Icons.Rounded.LiveTv,
             )
@@ -1562,7 +1369,7 @@ private fun MockupLiveRail(
                 itemsIndexed(categories, key = { _, category -> "${category.section}:${category.remoteId}" }) { index, category ->
                     val isActive = selectedCategoryId == category.remoteId
                     val attachRequesterToItem = isActive || (selectedIndex < 0 && index == 0)
-                    MockupRailItem(
+                    LiveRailItem(
                         label = category.name,
                         selected = isActive,
                         icon = Icons.Rounded.Tv,
@@ -1580,7 +1387,7 @@ private fun MockupLiveRail(
 }
 
 @Composable
-private fun MockupRailHeader(
+private fun LiveRailHeader(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
@@ -1615,7 +1422,7 @@ private fun MockupRailHeader(
 }
 
 @Composable
-private fun MockupRailItem(
+private fun LiveRailItem(
     label: String,
     selected: Boolean,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1665,7 +1472,7 @@ private fun MockupRailItem(
 }
 
 @Composable
-private fun MockupLiveHero(
+private fun LiveHero(
     modifier: Modifier,
     channel: ChannelEntity?,
     guide: List<EpgEventEntity>,
@@ -1805,7 +1612,7 @@ private fun MockupLiveHero(
 }
 
 @Composable
-private fun MockupEpgGrid(
+private fun LiveEpgGrid(
     modifier: Modifier,
     channels: List<ChannelEntity>,
     highlightedChannel: ChannelEntity?,
@@ -2694,485 +2501,6 @@ private fun PlayerPreferenceButton(
 }
 
 @Composable
-private fun LiveHeroPanel(
-    modifier: Modifier,
-    categories: List<CategoryEntity>,
-    channels: List<ChannelEntity>,
-    selectedCategoryId: String?,
-    highlightedChannel: ChannelEntity?,
-    guide: List<EpgEventEntity>,
-    onCategorySelected: (CategoryEntity) -> Unit,
-    onChannelFocused: (ChannelEntity) -> Unit,
-    onPlayChannel: (ChannelEntity) -> Unit,
-    onToggleFavorite: () -> Unit,
-) {
-    val now = System.currentTimeMillis()
-    val current = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
-    val next = guide.firstOrNull { it.startEpochMillis > (current?.startEpochMillis ?: 0L) }
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xFF080808),
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Artwork(
-                url = highlightedChannel?.logoUrl,
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(8.dp),
-                contentScale = ContentScale.Crop,
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xF2050505),
-                                Color(0xD9050505),
-                                Color(0x99050505),
-                                Color(0xF2050505),
-                            ),
-                        ),
-                    ),
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(22.dp),
-            ) {
-                LiveCategoryColumn(
-                    modifier = Modifier.width(220.dp).fillMaxHeight(),
-                    categories = categories,
-                    selectedCategoryId = selectedCategoryId,
-                    onCategorySelected = onCategorySelected,
-                )
-
-                LiveChannelColumn(
-                    modifier = Modifier.width(430.dp).fillMaxHeight(),
-                    channels = channels,
-                    highlightedChannel = highlightedChannel,
-                    onChannelFocused = onChannelFocused,
-                    onPlayChannel = onPlayChannel,
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(start = 10.dp),
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(GuideGreen)
-                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                        ) {
-                            Text("LIVE", color = Color.Black, fontWeight = FontWeight.Black)
-                        }
-                        Text(
-                            "LIVE TV",
-                            color = MutedText,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = highlightedChannel?.name ?: "Select a channel",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = buildString {
-                            append("CH ")
-                            append(highlightedChannel?.channelNumber ?: "--")
-                            if (highlightedChannel?.hasCatchup == true) append("  ·  Catch-up available")
-                        },
-                        color = MutedText,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-
-                    Spacer(Modifier.height(22.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xCC111111),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text("Now Playing", color = MutedText, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                current?.title ?: "Guide data will appear after EPG sync.",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            current?.let {
-                                Text(formatEpgTime(it), color = GuideGreen, style = MaterialTheme.typography.titleMedium)
-                            }
-                            next?.let {
-                                Text("Next  ${it.title}", color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TvActionButton(
-                            onClick = { highlightedChannel?.let(onPlayChannel) },
-                            enabled = highlightedChannel != null,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
-                        ) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                            Spacer(Modifier.width(10.dp))
-                            Text("Play Live", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        }
-                        TvActionButton(
-                            onClick = onToggleFavorite,
-                            enabled = highlightedChannel != null,
-                            shape = RoundedCornerShape(8.dp),
-                            containerColor = Color(0xFF2A2A2A),
-                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
-                        ) {
-                            Icon(Icons.Rounded.Favorite, contentDescription = null)
-                            Spacer(Modifier.width(10.dp))
-                            Text("Favorite", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveCategoryColumn(
-    modifier: Modifier,
-    categories: List<CategoryEntity>,
-    selectedCategoryId: String?,
-    onCategorySelected: (CategoryEntity) -> Unit,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xA6111111),
-    ) {
-        Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
-            Text("Live TV", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-            Spacer(Modifier.height(12.dp))
-            LazyColumn(
-                modifier = Modifier
-                    .focusRestorer()
-                    .focusGroup(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(categories, key = { "${it.section}:${it.remoteId}" }) { category ->
-                    FocusCard(
-                        selected = selectedCategoryId == category.remoteId,
-                        onClick = { onCategorySelected(category) },
-                    ) {
-                        Text(
-                            text = category.name,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveChannelColumn(
-    modifier: Modifier,
-    channels: List<ChannelEntity>,
-    highlightedChannel: ChannelEntity?,
-    onChannelFocused: (ChannelEntity) -> Unit,
-    onPlayChannel: (ChannelEntity) -> Unit,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xB3111111),
-    ) {
-        if (channels.isEmpty()) {
-            EmptyState("No channels in this group")
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .focusRestorer()
-                    .focusGroup(),
-                contentPadding = PaddingValues(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(channels, key = { it.streamId }) { channel ->
-                    FocusCard(
-                        selected = channel.streamId == highlightedChannel?.streamId,
-                        focusTreatment = FocusTreatment.Outline,
-                        onClick = { onPlayChannel(channel) },
-                        onFocused = { onChannelFocused(channel) },
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            Artwork(
-                                url = channel.logoUrl,
-                                modifier = Modifier.size(64.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                contentScale = ContentScale.Fit,
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    channel.name,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    "CH ${channel.channelNumber ?: "--"}",
-                                    color = MutedText,
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveGuideTimeline(
-    modifier: Modifier,
-    channel: ChannelEntity?,
-    guide: List<EpgEventEntity>,
-) {
-    val now = System.currentTimeMillis()
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Panel.copy(alpha = 0.94f),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Program Guide", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                Text(channel?.name ?: "Select a channel", color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-
-            if (guide.isEmpty()) {
-                EmptyState("No EPG rows synced for this channel yet")
-            } else {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(guide.take(12), key = { "${it.startEpochMillis}:${it.title}" }) { event ->
-                        val isCurrent = now in event.startEpochMillis until event.endEpochMillis
-                        Surface(
-                            modifier = Modifier.width(280.dp).fillMaxHeight(),
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isCurrent) NetflixRed.copy(alpha = 0.28f) else PanelRaised,
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(
-                                    if (isCurrent) "NOW" else formatEpgShortTime(event),
-                                    color = if (isCurrent) GuideGreen else MutedText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Black,
-                                )
-                                Text(
-                                    event.title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                event.description?.takeIf(String::isNotBlank)?.let {
-                                    Text(it, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveDetailPanel(
-    modifier: Modifier,
-    channel: ChannelEntity?,
-    guide: List<EpgEventEntity>,
-    onPlay: () -> Unit,
-    onToggleFavorite: () -> Unit,
-) {
-    val now = System.currentTimeMillis()
-    val current = guide.firstOrNull { now in it.startEpochMillis until it.endEpochMillis } ?: guide.firstOrNull()
-    val next = guide.firstOrNull { it.startEpochMillis > (current?.startEpochMillis ?: 0L) }
-
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = Panel.copy(alpha = 0.92f),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Artwork(
-                    url = channel?.logoUrl,
-                    modifier = Modifier.size(118.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentScale = ContentScale.Fit,
-                )
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = channel?.name ?: "Select a channel",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = buildString {
-                            channel?.channelNumber?.let { append("Channel $it") }
-                            if (channel?.hasCatchup == true) append("  ·  Catch-up ready")
-                        }.ifBlank { "Live guide preview" },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MutedText,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TvActionButton(
-                            onClick = onPlay,
-                            shape = RoundedCornerShape(8.dp),
-                        ) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Play Live")
-                        }
-                        TvActionButton(
-                            onClick = onToggleFavorite,
-                            shape = RoundedCornerShape(8.dp),
-                            containerColor = Color(0xFF2A2A2A),
-                        ) {
-                            Icon(Icons.Rounded.Favorite, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Favorite")
-                        }
-                    }
-                }
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                color = Color(0xFF151515),
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Now Playing", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = current?.title ?: "Guide data will appear here after sync or short-EPG fallback.",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    current?.let {
-                        Text(formatEpgTime(it), color = GuideGreen, style = MaterialTheme.typography.bodyMedium)
-                        it.description?.takeIf(String::isNotBlank)?.let { description ->
-                            Text(
-                                description,
-                                color = MutedText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    next?.let {
-                        Text("Next: ${formatEpgTime(it)}  ${it.title}", color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-
-            Text("Program Guide", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Surface(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                color = Color(0xFF101010),
-            ) {
-                if (guide.isEmpty()) {
-                    EmptyState("No EPG rows synced for this channel yet")
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(guide.take(24), key = { "${it.startEpochMillis}:${it.title}" }) { event ->
-                            val isCurrent = now in event.startEpochMillis until event.endEpochMillis
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isCurrent) NetflixRed.copy(alpha = 0.22f) else PanelRaised,
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                    verticalAlignment = Alignment.Top,
-                                ) {
-                                    Text(
-                                        text = formatEpgTime(event),
-                                        modifier = Modifier.width(130.dp),
-                                        color = if (isCurrent) GuideGreen else MutedText,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(event.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        event.description?.takeIf(String::isNotBlank)?.let {
-                                            Text(it, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun MovieDialog(
     movie: MovieEntity,
     viewModel: MainViewModel,
@@ -3697,21 +3025,6 @@ private fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedLeadingIconColor = NetflixRed,
     unfocusedLeadingIconColor = MutedText,
 )
-
-private fun formatLastSync(epochMillis: Long?): String {
-    if (epochMillis == null) return "Not synced yet"
-    return DateFormat.getDateTimeInstance().format(Date(epochMillis))
-}
-
-private fun formatEpgTime(event: EpgEventEntity): String {
-    val formatter = SimpleDateFormat("EEE HH:mm", Locale.getDefault())
-    return "${formatter.format(Date(event.startEpochMillis))} - ${formatter.format(Date(event.endEpochMillis))}"
-}
-
-private fun formatEpgShortTime(event: EpgEventEntity): String {
-    val formatter = SimpleDateFormat("h:mm a", Locale.getDefault())
-    return formatter.format(Date(event.startEpochMillis))
-}
 
 private fun formatEpgClockRange(event: EpgEventEntity): String {
     val formatter = SimpleDateFormat("h:mm a", Locale.getDefault())

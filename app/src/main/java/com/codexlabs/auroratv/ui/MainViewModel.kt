@@ -93,9 +93,6 @@ class MainViewModel(
     fun observeGuide(streamId: Long) =
         repository.observeGuide(streamId)
 
-    fun observeFavoriteIds(targetType: TargetType) =
-        repository.observeFavoriteIds(targetType)
-
     fun syncAll(force: Boolean = true) {
         if (_isSyncing.value) return
         viewModelScope.launch {
